@@ -18,7 +18,7 @@ The web app counts anonymous usage with [GoatCounter](https://www.goatcounter.co
 
 ## Contact form
 
-The info tab has a contact form (email address, subject, message; no file upload). Messages are relayed by [Web3Forms](https://web3forms.com) to the developer by email, with the sender's address as reply-to. They contain what the sender enters, plus the sender's IP address, which Web3Forms adds. A hidden field stops simple spam bots.
+The info tab has a contact form (email address, subject, message; no file upload). Messages are relayed by [Web3Forms](https://web3forms.com) to the developer by email, with the sender's address as reply-to. They contain what the sender enters, plus the sender's IP address, which Web3Forms adds. A hidden field stops simple spam bots. A (quick) reply cannot be guaranteed.
 
 ## Homodimers: not validated
 

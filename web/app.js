@@ -9,6 +9,7 @@ const MAX_PAIRS = 1000;
 const MAX_PRIMERS = 200;
 const DISPLAY_LIMIT = 500;      // rows rendered in the table; downloads hold all
 const CHUNK = 25;               // computations between screen updates
+const GOATCOUNTER = 'dimerdetective';   // GoatCounter site code (https://CODE.goatcounter.com); empty = no counting
 
 const EXAMPLES = {
   pairs: [
@@ -130,6 +131,39 @@ async function loadFile(file) {
   setMessages([`loaded ${file.name}`]);
 }
 
+// ── Anonymous usage counts ────────────────────────────────────────────────
+// Events carry the mode, interaction type and numbers only, never sequences,
+// primer IDs or file names. GoatCounter drops more than 4 requests per second
+// from one address, so events go out one by one.
+
+const pendingEvents = [];
+let eventTimer = 0;
+
+function track(...paths) {
+  if (!GOATCOUNTER) return;
+  pendingEvents.push(...paths);
+  sendEvents();
+}
+
+function sendEvents() {
+  const gc = window.goatcounter;
+  if (eventTimer || !pendingEvents.length || !(gc && gc.count)) return;
+  const path = pendingEvents.shift();
+  gc.count({ path, title: path, event: true });
+  eventTimer = setTimeout(() => { eventTimer = 0; sendEvents(); }, 350);
+}
+
+function setupCounting() {
+  if (!GOATCOUNTER || !/^https?:$/.test(location.protocol)) return;
+  const s = document.createElement('script');
+  s.async = true;
+  s.src = 'https://gc.zgo.at/count.js';
+  s.dataset.goatcounter = `https://${GOATCOUNTER}.goatcounter.com/count`;
+  // count.js sends the page view itself on load; events follow after it
+  s.onload = () => { eventTimer = setTimeout(() => { eventTimer = 0; sendEvents(); }, 350); };
+  document.head.appendChild(s);
+}
+
 // ── Running ───────────────────────────────────────────────────────────────
 
 function setProgress(done, total, what) {
@@ -184,6 +218,9 @@ async function run() {
       state.run = { mode: 'multiplex', type, primers: parsed.primers, entries, stem: state.stems.multiplex };
     }
     render();
+    const r = state.run;
+    const size = text === EXAMPLES[r.mode] ? 'example' : (r.mode === 'pairs' ? r.rows : r.primers).length;
+    track(`run/${r.mode}/${r.type}`, `size/${r.mode}/${size}`);
   } finally {
     state.busy = false;
     $('run-btn').disabled = false;
@@ -355,6 +392,7 @@ function wire() {
     document.querySelectorAll('.page-tab').forEach(x => x.classList.toggle('active', x === b));
     $('page-calc').classList.toggle('hidden', b.dataset.page !== 'calc');
     $('page-info').classList.toggle('hidden', b.dataset.page !== 'info');
+    if (b.dataset.page === 'info') track('page/info');
   }));
   document.querySelectorAll('[data-toggle]').forEach(h => h.addEventListener('click', () => {
     const body = $(h.dataset.toggle + '-body');
@@ -407,9 +445,10 @@ function wire() {
   document.querySelectorAll('[data-table]').forEach(b => b.addEventListener('click', () => {
     downloadTable(b.dataset.table);
     b.closest('.dl-menu').classList.remove('open');
+    track('download/results-' + b.dataset.table);
   }));
-  $('dl-alignments').addEventListener('click', downloadAlignments);
-  $('dl-summary').addEventListener('click', downloadSummary);
+  $('dl-alignments').addEventListener('click', () => { downloadAlignments(); track('download/alignments'); });
+  $('dl-summary').addEventListener('click', () => { downloadSummary(); track('download/summary'); });
 
   document.querySelectorAll('.max-pairs').forEach(s => { s.textContent = MAX_PAIRS; });
   document.querySelectorAll('.max-primers').forEach(s => { s.textContent = MAX_PRIMERS; });
@@ -418,6 +457,7 @@ function wire() {
 }
 
 wire();
+setupCounting();
 DD.init(createThal).then(() => {
   $('engine-status').textContent = 'primer3 engine ready';
   $('run-btn').disabled = false;

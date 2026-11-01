@@ -71,7 +71,11 @@ python python/make_primer_alignments.py --input pairs.xlsx --output results.tsv 
 python python/make_primer_alignments.py --mode multiplex --input primers.xlsx --output results.xlsx --sort asc
 ```
 
-## License and citation
+## How to cite
+
+DimerDetective version 1.2, Jo Vandesompele, Ghent University, https://jvdesomp.github.io/DimerDetective/
+
+## License and references
 
 GPL-2.0, as primer3 and primer3-py. © Ghent University 2026.
 

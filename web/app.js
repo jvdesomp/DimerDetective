@@ -372,9 +372,12 @@ function wire() {
   });
   $('threshold-custom').addEventListener('input', render);
   ['sort-mode', 'filter-mode', 'gap-char'].forEach(id => $(id).addEventListener('change', render));
+  const updateHomodimerNote = () => $('homodimer-note').classList.toggle('hidden', $('type-mode').value === 'heterodimers');
   $('type-mode').addEventListener('change', () => {
+    updateHomodimerNote();
     if (state.run) setMessages(['interactions changed: run again to update the results']);
   });
+  updateHomodimerNote();
 
   $('run-btn').addEventListener('click', run);
   $('example-btn').addEventListener('click', () => {

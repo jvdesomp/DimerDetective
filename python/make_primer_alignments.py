@@ -17,6 +17,11 @@ Both heterodimer directions are computed:
 Self-dimer end ΔG is also computed for each primer, and optionally displayed
 use --type both  or  --type homodimers to include homodimer blocks.
 
+Homodimer values are NOT validated: in the training data they had no
+predictive value for no-template control signal (AUC 0.60, against 0.94 for
+min_end_hetero).  They are reported for completeness only; classification
+uses min_end_hetero.
+
 Expected Excel columns (case-insensitive):
   forward_primer_name, forward_primer, reverse_primer_name, reverse_primer
   outcome  (optional; 'dimer' / 'clean' — used for label and prediction check)
@@ -921,10 +926,11 @@ def main():
     parser.add_argument(
         '--type', choices=['heterodimers', 'homodimers', 'both'], default='heterodimers',
         help=(
-            'which interactions to compute and report (default: both)\n'
+            'which interactions to compute and report (default: heterodimers)\n'
             '  heterodimers — only cross-primer interactions\n'
             '  homodimers   — only self-dimer interactions\n'
-            '  both         — heterodimers and homodimers'
+            '  both         — heterodimers and homodimers\n'
+            'homodimer predictions are not validated; interpret with caution'
         ),
     )
     args = parser.parse_args()
@@ -934,6 +940,8 @@ def main():
                  "accessible on this system and ntthal is not on PATH.\n"
                  "Install primer3 (conda install -c bioconda primer3) to provide ntthal.")
     print(f"Alignments: {method}")
+    if args.type != 'heterodimers':
+        print("Note: homodimer predictions are not validated; interpret them with caution.")
 
     if args.mode == 'pairs':
         run_pairs(args)

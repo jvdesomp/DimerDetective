@@ -51,6 +51,7 @@
             <option value="homodimers">homodimers</option>
             <option value="both">heterodimers and homodimers</option>
           </select>
+          <p class="field-warning hidden" id="homodimer-note">&#9888; homodimer predictions are not validated (see info)</p>
         </div>
         <div>
           <label for="sort-mode">sort results</label>
@@ -211,8 +212,19 @@
         </tbody>
       </table>
       <p>The direction with the lower &Delta;G is the dominant direction; its alignment is shown first. Classification uses
-      <code>min_end_hetero</code> only: the training data held no evidence that homodimers contribute to no-template control
-      signal, so <code>min_end_homo</code> is reported for completeness but carries no validated predictive weight.</p>
+      <code>min_end_hetero</code> only.</p>
+      <div class="warning" id="homodimer-warning">
+        <p><strong>&#9888; homodimer predictions are not validated.</strong> In the training data, the no-template control (NTC)
+        signal cannot tell homodimers from heterodimers, and predicted homodimers had no predictive value:</p>
+        <ul>
+          <li><code>min_end_homo</code> gave an AUC of 0.60, against 0.94 for <code>min_end_hetero</code>, and added nothing to
+          <code>min_end_hetero</code> in a logistic model (p = 0.30)</li>
+          <li>7 of the 100 clean pairs had a strong predicted homodimer (below &minus;2.44 kcal/mol, down to &minus;6.46 kcal/mol)
+          without any NTC signal</li>
+        </ul>
+        <p>Homodimer values (<code>end_left-left_dg</code>, <code>end_right-right_dg</code>, <code>min_end_homo</code> and homodimer
+        rows) are reported for completeness only. Interpret them with caution.</p>
+      </div>
     </div>
   </section>
 

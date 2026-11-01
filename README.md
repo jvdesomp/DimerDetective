@@ -12,6 +12,15 @@ The thermodynamics are not reimplemented. The C source of primer3's `thal` algor
 - `web/dd-core.js` ports the input parsing, scoring metrics and output formats of `python/make_primer_alignments.py`.
 - `web/app.js` is the interface. Sequences never leave the browser.
 
+## Homodimers: not validated
+
+Classification uses `min_end_hetero` only. Homodimer values (`end_left-left_dg`, `end_right-right_dg`, `min_end_homo` and homodimer rows) are reported for completeness, but they are not validated. In the Biogazelle training data, the no-template control (NTC) signal cannot tell homodimers from heterodimers, and predicted homodimers had no predictive value:
+
+- `min_end_homo` gave an AUC of 0.60, against 0.94 for `min_end_hetero`, and added nothing to `min_end_hetero` in a logistic model (p = 0.30).
+- 7 of the 100 clean pairs had a strong predicted homodimer (below −2.44 kcal/mol, down to −6.46 kcal/mol) without any NTC signal.
+
+Interpret homodimer values with caution.
+
 ## Validation
 
 The web app was compared with `primer3.calc_end_stability` (primer3-py 2.4.0) on more than 36,000 primer combinations, including the 200 pairs of the Biogazelle training data and random sequences. The largest ΔG difference was 5 × 10⁻⁷ cal/mol, which is floating-point rounding.

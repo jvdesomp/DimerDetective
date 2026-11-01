@@ -32,6 +32,9 @@ textarea{resize:vertical;font-family:'Courier New',monospace;font-size:.82em;min
 .upload-area input{display:none}
 .input-actions{display:flex;gap:12px;margin-top:8px;align-items:center;flex-wrap:wrap}
 .settings-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.warning{background:#fef3e8;border-left:4px solid #d35400;border-radius:4px;padding:10px 14px;margin:10px 0}
+.warning p:last-child{margin-bottom:0}
+.field-warning{font-size:.78em;color:#a04000;margin-top:4px}
 .fixed-params-note{font-size:.78em;color:#777;margin-top:10px;font-style:italic}
 table{width:100%;border-collapse:collapse;font-size:.85em}
 th{background:#f0f3f8;padding:7px 10px;text-align:left;border-bottom:2px solid #dde3ee;white-space:nowrap}

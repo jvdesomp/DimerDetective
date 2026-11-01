@@ -87,7 +87,7 @@
         <button class="tab active" id="tab-pairs" data-mode="pairs">pair mode</button>
         <button class="tab" id="tab-multiplex" data-mode="multiplex">multiplex mode</button>
       </div>
-      <p class="hint" id="hint-pairs">one primer pair per line: <code>left ID</code> <code>left sequence</code> <code>right ID</code> <code>right sequence</code>, separated by tabs, commas or semicolons. IDs are optional; a header row and an <code>outcome</code> column (dimer or clean) are recognised. Up to <span class="max-pairs"></span> pairs.</p>
+      <p class="hint" id="hint-pairs">one primer pair per line: <code>left ID</code> <code>left sequence</code> <code>right ID</code> <code>right sequence</code>, separated by tabs, commas or semicolons. IDs are optional; a header row and an <code>outcome</code> column (dimer or clean) are recognized. Up to <span class="max-pairs"></span> pairs.</p>
       <p class="hint hidden" id="hint-multiplex">one primer per line: <code>ID</code> <code>sequence</code>, or the sequence only. Every primer is tested against every other primer, up to <span class="max-primers"></span> primers. A table of primer pairs (four columns) is also accepted: all unique primers are then used.</p>
       <textarea id="input-text" spellcheck="false" aria-label="primer input"></textarea>
       <div class="input-actions">
@@ -161,7 +161,7 @@
       <p><strong>DimerDetective</strong> predicts primer dimer formation from the 3&prime; end stability of every primer
       combination. Primer dimers form when the 3&prime; end of one primer hybridizes to another primer (or to itself), leading
       to spurious amplification products and lower PCR efficiency. A more negative &Delta;G means a more stable dimer and a higher risk.</p>
-      <p>Everything runs in your browser: your sequences are never sent to a server. <strong>Pair mode</strong> analyses defined
+      <p>Everything runs in your browser: your sequences are never sent to a server. <strong>Pair mode</strong> analyzes defined
       primer pairs; <strong>multiplex mode</strong> tests every primer in a set against every other primer.</p>
     </div>
   </section>
@@ -269,12 +269,12 @@
       <h3>pair mode</h3>
       <ul>
         <li>four columns: <code>left ID</code> <code>left sequence</code> <code>right ID</code> <code>right sequence</code>; IDs are optional</li>
-        <li>recognised column names (case-insensitive) include <code>forward_primer_name</code>, <code>forward_primer</code>, <code>reverse_primer_name</code>, <code>reverse_primer</code> and <code>outcome</code></li>
+        <li>recognized column names (case-insensitive) include <code>forward_primer_name</code>, <code>forward_primer</code>, <code>reverse_primer_name</code>, <code>reverse_primer</code> and <code>outcome</code></li>
       </ul>
       <h3>multiplex mode</h3>
       <ul>
         <li>one primer per row: <code>ID</code> and <code>sequence</code>, or the sequence only (IDs P001, P002, &hellip; are generated)</li>
-        <li>recognised column names include <code>primer_name</code>, <code>primer_id</code>, <code>name</code>, <code>id</code>, <code>primer_seq</code>, <code>sequence</code> and <code>seq</code></li>
+        <li>recognized column names include <code>primer_name</code>, <code>primer_id</code>, <code>name</code>, <code>id</code>, <code>primer_seq</code>, <code>sequence</code> and <code>seq</code></li>
         <li>N primers give N &times; (N &minus; 1) / 2 heterodimers plus N homodimers</li>
       </ul>
       <h3>general</h3>

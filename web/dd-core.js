@@ -286,7 +286,7 @@
     return null;
   }
 
-  // Split one line on `sep`, honouring "quoted" cells.
+  // Split one line on `sep`, honoring "quoted" cells.
   function splitQuoted(line, sep) {
     const cells = [];
     let cur = '', inQ = false;

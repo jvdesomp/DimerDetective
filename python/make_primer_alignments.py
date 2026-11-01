@@ -1,7 +1,7 @@
 """
 make_primer_alignments.py
 ─────────────────────────
-Computes primer3 nearest-neighbour 3'-end ΔG for primer pairs or a multiplex
+Computes primer3 nearest-neighbor 3'-end ΔG for primer pairs or a multiplex
 primer set and writes alignment and/or results files.
 
 ════════════════════════════════════════════════════════════════════════════════
@@ -381,7 +381,7 @@ _SEP = '─' * 72
 
 def _aln_block(aln, top_id, bot_id, indent='  '):
     """
-    Return indented alignment lines (list) labelled with primer IDs.
+    Return indented alignment lines (list) labeled with primer IDs.
     top_id : identifier of the primer whose 3' end is shown on top.
     bot_id : identifier of the primer on the bottom strand.
     """
@@ -508,7 +508,7 @@ def format_multiplex_entry(pair_type, id_a, seq_a, id_b, seq_b,
     return lines
 
 
-# ── Column name normalisation ──────────────────────────────────────────────
+# ── Column name normalization ──────────────────────────────────────────────
 
 def find_col(df, candidates):
     """Return the first matching column name (case-insensitive), or None.
@@ -551,11 +551,11 @@ def _read_primer_list(path):
 
     _label_candidates = ['primer_seq', 'primer_sequence', 'sequence', 'seq',
                          'primer_name', 'primer_id', 'name', 'id']
-    any_recognised = find_col(df_peek, _label_candidates) is not None
+    any_recognized = find_col(df_peek, _label_candidates) is not None
     all_dna        = all(_looks_like_dna(str(c)) for c in df_peek.columns)
     any_dna        = any(_looks_like_dna(str(c)) for c in df_peek.columns)
 
-    has_header = any_recognised and not all_dna
+    has_header = any_recognized and not all_dna
     if not has_header and not any_dna:
         has_header = True
 
@@ -638,7 +638,7 @@ def run_pairs(args):
     ])
     col_outcome  = find_col(df, ['outcome', 'label', 'class', 'result', 'status'])
 
-    # ── DNA-content fallback when column names are not recognised ──────────
+    # ── DNA-content fallback when column names are not recognized ──────────
     # If either sequence column was not found by name, try to identify the
     # two sequence columns by DNA content, then assign left→fwd, right→rev.
     if col_fwd_seq is None or col_rev_seq is None:
@@ -663,7 +663,7 @@ def run_pairs(args):
             sys.exit(
                 f"ERROR: could not find column for {label}.\n"
                 f"Available columns: {list(df.columns)}\n"
-                f"Recognised name patterns: forward/fwd/left + _primer/_sequence/_seq\n"
+                f"Recognized name patterns: forward/fwd/left + _primer/_sequence/_seq\n"
                 f"                          reverse/rev/right + _primer/_sequence/_seq\n"
                 f"If your columns have other names, rename them or add a row with these headers."
             )

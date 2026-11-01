@@ -16,6 +16,10 @@ The thermodynamics are not reimplemented. The C source of primer3's `thal` algor
 
 The web app counts anonymous usage with [GoatCounter](https://www.goatcounter.com) (site code `dimerdetective`): page views, runs per mode and interaction type, the number of pairs or primers per run, and downloads. GoatCounter uses no cookies and stores no personal data. Sequences, primer names and file names are never sent. Nothing is counted when the page is opened from `localhost` or as a local file.
 
+## Contact form
+
+The info tab has a contact form (email address, subject, message; no file upload). Messages are relayed by [Web3Forms](https://web3forms.com) to the developer by email, with the sender's address as reply-to, and contain only what the sender enters. A hidden field stops simple spam bots.
+
 ## Homodimers: not validated
 
 Classification uses `min_end_hetero` only. Homodimer values (`end_left-left_dg`, `end_right-right_dg`, `min_end_homo` and homodimer rows) are reported for completeness, but they are not validated. In the Biogazelle training data, the no-template control (NTC) signal cannot tell homodimers from heterodimers, and predicted homodimers had no predictive value:

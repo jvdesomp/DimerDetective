@@ -35,6 +35,13 @@ textarea{resize:vertical;font-family:'Courier New',monospace;font-size:.82em;min
 .warning{background:#fef3e8;border-left:4px solid #d35400;border-radius:4px;padding:10px 14px;margin:10px 0}
 .warning p:last-child{margin-bottom:0}
 .field-warning{font-size:.78em;color:#a04000;margin-top:4px}
+.contact-form{max-width:560px}
+.contact-form label{margin-top:8px}
+.contact-form input[type=email]{width:100%;padding:6px 9px;border:1px solid #ccd3e0;border-radius:5px;font-size:.9em;font-family:inherit}
+.contact-form textarea{font-family:inherit;font-size:.9em;min-height:120px}
+.contact-form .status.ok{color:#27ae60}
+.contact-form .status.err{color:#c0392b}
+.hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
 .fixed-params-note{font-size:.78em;color:#777;margin-top:10px;font-style:italic}
 table{width:100%;border-collapse:collapse;font-size:.85em}
 th{background:#f0f3f8;padding:7px 10px;text-align:left;border-bottom:2px solid #dde3ee;white-space:nowrap}

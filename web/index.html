@@ -167,6 +167,8 @@
       <p>To see how the app is used, anonymous usage statistics are counted with <a href="https://www.goatcounter.com">GoatCounter</a>: page views, runs per mode and interaction type, the number of pairs or
       primers per run, and downloads. GoatCounter uses no cookies and stores no personal data; sequences, primer names and
       file names are never included.</p>
+      <p>Messages sent with the <a href="#contact">contact form</a> are relayed by email through Web3Forms; they contain only
+      what you enter in the form.</p>
     </div>
   </section>
 
@@ -318,11 +320,36 @@
       Remm M, Rozen SG (2012) Primer3, new capabilities and interfaces. <em>Nucleic Acids Res</em> 40:e115.</p>
     </div>
   </section>
+
+  <section class="card" id="contact">
+    <div class="card-header">contact</div>
+    <div class="card-body info-section">
+      <p>Questions, suggestions or problems? Send a message to the developer. Your message is relayed by email through
+      <a href="https://web3forms.com">Web3Forms</a> and contains only what you enter below.</p>
+      <form id="contact-form" class="contact-form" novalidate>
+        <label for="contact-email">your email address</label>
+        <input type="email" id="contact-email" name="email" autocomplete="email" required maxlength="200">
+        <label for="contact-subject">subject</label>
+        <input type="text" id="contact-subject" name="subject" required maxlength="150">
+        <label for="contact-message">message</label>
+        <textarea id="contact-message" name="message" required maxlength="5000" rows="7"></textarea>
+        <div class="hp" aria-hidden="true">
+          <label for="contact-website">leave this field empty</label>
+          <input type="text" id="contact-website" name="website" tabindex="-1" autocomplete="off">
+        </div>
+        <div class="btn-group" style="margin-top:10px">
+          <button type="submit" class="btn btn-primary" id="contact-send">send message</button>
+        </div>
+        <p class="status" id="contact-status" role="status"></p>
+      </form>
+    </div>
+  </section>
 </main>
 
 <div class="footer">&copy; Ghent University 2026 &middot; DimerDetective <span class="version"></span> &middot;
   thermodynamics by <a href="https://github.com/primer3-org/primer3">primer3</a> via <a href="https://github.com/libnano/primer3-py">primer3-py</a> 2.4.0, compiled to WebAssembly &middot;
-  <a href="https://github.com/jvdesomp/DimerDetective">source code</a></div>
+  <a href="https://github.com/jvdesomp/DimerDetective">source code</a> &middot;
+  <a href="#contact" id="footer-contact">contact</a></div>
 </div>
 </body>
 </html>

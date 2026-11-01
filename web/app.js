@@ -10,6 +10,7 @@ const MAX_PRIMERS = 200;
 const DISPLAY_LIMIT = 500;      // rows rendered in the table; downloads hold all
 const CHUNK = 25;               // computations between screen updates
 const GOATCOUNTER = 'dimerdetective';   // GoatCounter site code (https://CODE.goatcounter.com); empty = no counting
+const WEB3FORMS_KEY = '4e58b612-17f4-4b78-8b83-2975281ebd71';   // Web3Forms access key (public by design); empty = contact form disabled
 
 const EXAMPLES = {
   pairs: [
@@ -385,6 +386,60 @@ function downloadSummary() {
   download(lines.join('\n') + '\n', stem() + '_primer_summary.tsv');
 }
 
+// ── Contact form ──────────────────────────────────────────────────────────
+// Sent to the developer by email through Web3Forms. The sender's address is
+// the reply-to. A hidden field catches bots: if it is filled in, nothing is
+// sent but the form reports success.
+
+function showInfoSection(id) {
+  document.querySelector('.page-tab[data-page="info"]').click();
+  $(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function contactStatus(text, kind) {
+  const s = $('contact-status');
+  s.textContent = text;
+  s.className = 'status' + (kind ? ' ' + kind : '');
+}
+
+async function sendContact(e) {
+  e.preventDefault();
+  const email = $('contact-email').value.trim();
+  const subject = $('contact-subject').value.trim();
+  const message = $('contact-message').value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { contactStatus('please enter a valid email address', 'err'); return; }
+  if (!subject || !message) { contactStatus('please fill in a subject and a message', 'err'); return; }
+  if ($('contact-website').value) { $('contact-form').reset(); contactStatus('thank you, your message was sent', 'ok'); return; }
+  if (!WEB3FORMS_KEY) { contactStatus('the contact form is not available yet', 'err'); return; }
+
+  $('contact-send').disabled = true;
+  contactStatus('sending…');
+  try {
+    const r = await fetch('https://api.web3forms.com/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        access_key: WEB3FORMS_KEY,
+        subject: 'DimerDetective: ' + subject,
+        from_name: 'DimerDetective contact form',
+        email,
+        replyto: email,
+        message,
+        botcheck: false,
+      }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || data.success === false) throw new Error(data.message || 'HTTP ' + r.status);
+    $('contact-form').reset();
+    contactStatus('thank you, your message was sent', 'ok');
+    track('contact/sent');
+  } catch (err) {
+    contactStatus('sending failed (' + err.message + '); please try again later', 'err');
+  } finally {
+    $('contact-send').disabled = false;
+  }
+}
+
 // ── Wiring ────────────────────────────────────────────────────────────────
 
 function wire() {
@@ -394,6 +449,12 @@ function wire() {
     $('page-info').classList.toggle('hidden', b.dataset.page !== 'info');
     if (b.dataset.page === 'info') track('page/info');
   }));
+  document.querySelectorAll('a[href="#contact"]').forEach(a => a.addEventListener('click', e => {
+    e.preventDefault();
+    showInfoSection('contact');
+  }));
+  $('contact-form').addEventListener('submit', sendContact);
+  if (location.hash === '#contact') setTimeout(() => showInfoSection('contact'), 0);
   document.querySelectorAll('[data-toggle]').forEach(h => h.addEventListener('click', () => {
     const body = $(h.dataset.toggle + '-body');
     const hide = !body.classList.contains('hidden');

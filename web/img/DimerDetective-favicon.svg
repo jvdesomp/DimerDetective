@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">DimerDetective favicon</title>
+  <desc id="desc">Simplified magnifying glass over a primer dimer.</desc>
+  <defs>
+    <style>.navy{stroke:#081b3d;fill:none;stroke-linecap:round;stroke-linejoin:round}.teal{stroke:#13a69a;fill:none;stroke-linecap:round;stroke-linejoin:round}.fill-teal{fill:#13a69a}</style>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="#ffffff"/>
+  <circle class="navy" cx="244" cy="230" r="150" stroke-width="22"/>
+  <path class="navy" stroke-width="24" d="M350 336 L450 436"/>
+  <path class="navy" stroke-width="14" d="M86 260 H170"/><path class="navy" stroke-width="14" d="M326 210 H430"/>
+  <circle class="fill-teal" cx="54" cy="210" r="7"/><circle class="fill-teal" cx="78" cy="210" r="7"/><circle class="fill-teal" cx="102" cy="210" r="7"/>
+  <circle class="fill-teal" cx="388" cy="260" r="7"/><circle class="fill-teal" cx="412" cy="260" r="7"/><circle class="fill-teal" cx="436" cy="260" r="7"/>
+  <path class="navy" stroke-width="14" d="M160 210 H320"/><path class="teal" stroke-width="14" d="M145 210 H255"/><path class="teal" stroke-width="14" d="M145 210 L180 183"/><path class="teal" stroke-width="14" d="M145 210 L180 237"/>
+  <path class="teal" stroke-width="14" d="M178 260 H316"/><path class="navy" stroke-width="14" d="M120 260 H258"/><path class="teal" stroke-width="14" d="M316 260 L281 233"/><path class="teal" stroke-width="14" d="M316 260 L281 287"/>
+  <path class="teal" stroke-width="10" d="M198 218 V252"/><path class="teal" stroke-width="10" d="M226 218 V252"/><path class="teal" stroke-width="10" d="M254 218 V252"/>
+</svg>

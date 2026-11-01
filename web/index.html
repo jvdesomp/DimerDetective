@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DimerDetective</title>
+<meta name="description" content="Primer dimer prediction from primer3 3' end stability, running in your browser.">
+<meta name="theme-color" content="#1a2744">
+<link rel="icon" type="image/svg+xml" href="img/DimerDetective-favicon.svg">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
+<script src="thal.js" defer></script>
+<script src="dd-core.js" defer></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+<header>
+  <img src="img/DimerDetective-logo_inverse.svg" alt="DimerDetective logo">
+  <div>
+    <h1>DimerDetective <span id="version">1.2</span></h1>
+    <div class="sub">primer dimer prediction with primer3, in your browser</div>
+  </div>
+</header>
+
+<div class="container">
+
+<nav class="page-tabs">
+  <button class="page-tab active" id="ptab-calc" data-page="calc">calculator</button>
+  <button class="page-tab" id="ptab-info" data-page="info">info</button>
+</nav>
+
+<main id="page-calc">
+  <section class="card">
+    <div class="card-header toggle" data-toggle="settings">&#9881; parameters and settings <span>&#9660;</span></div>
+    <div class="card-body" id="settings-body">
+      <div class="settings-grid">
+        <div>
+          <label for="threshold-preset">&Delta;G threshold (kcal/mol)</label>
+          <select id="threshold-preset">
+            <option value="-2.44">&minus;2.44 (100% specificity)</option>
+            <option value="-1.00" selected>&minus;1.00 (95% sensitivity)</option>
+            <option value="-0.27">&minus;0.27 (100% sensitivity)</option>
+            <option value="custom">custom&hellip;</option>
+          </select>
+          <input type="text" inputmode="decimal" id="threshold-custom" value="-1.00" class="hidden" style="margin-top:4px;width:120px" aria-label="custom threshold">
+        </div>
+        <div>
+          <label for="type-mode">interactions</label>
+          <select id="type-mode">
+            <option value="heterodimers" selected>heterodimers</option>
+            <option value="homodimers">homodimers</option>
+            <option value="both">heterodimers and homodimers</option>
+          </select>
+        </div>
+        <div>
+          <label for="sort-mode">sort results</label>
+          <select id="sort-mode">
+            <option value="asc" selected>by &Delta;G, most stable dimer first</option>
+            <option value="desc">by &Delta;G, least stable dimer first</option>
+            <option value="input">input order</option>
+          </select>
+        </div>
+        <div>
+          <label for="filter-mode">filter</label>
+          <select id="filter-mode">
+            <option value="all">show all</option>
+            <option value="flagged">flagged only (&lt; threshold)</option>
+          </select>
+        </div>
+        <div>
+          <label for="gap-char">bulge character in alignments</label>
+          <select id="gap-char">
+            <option value="." selected>dot (.)</option>
+            <option value=" ">space</option>
+            <option value="-">dash (-)</option>
+          </select>
+        </div>
+      </div>
+      <p class="fixed-params-note">fixed reaction conditions, as used for calibration: 50 mM Na<sup>+</sup>, 1.5 mM Mg<sup>2+</sup>, 0.6 mM dNTP, 50 nM primer, 37 &deg;C</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header toggle" data-toggle="input">&#128196; input <span>&#9660;</span></div>
+    <div class="card-body" id="input-body">
+      <div class="tabs" role="tablist">
+        <button class="tab active" id="tab-pairs" data-mode="pairs">pair mode</button>
+        <button class="tab" id="tab-multiplex" data-mode="multiplex">multiplex mode</button>
+      </div>
+      <p class="hint" id="hint-pairs">one primer pair per line: <code>left ID</code> <code>left sequence</code> <code>right ID</code> <code>right sequence</code>, separated by tabs, commas or semicolons. IDs are optional; a header row and an <code>outcome</code> column (dimer or clean) are recognised. Up to <span class="max-pairs"></span> pairs.</p>
+      <p class="hint hidden" id="hint-multiplex">one primer per line: <code>ID</code> <code>sequence</code>, or the sequence only. Every primer is tested against every other primer, up to <span class="max-primers"></span> primers. A table of primer pairs (four columns) is also accepted: all unique primers are then used.</p>
+      <textarea id="input-text" spellcheck="false" aria-label="primer input"></textarea>
+      <div class="input-actions">
+        <label class="upload-area" id="upload-area">&#128194; click or drop a file: .xlsx, .csv, .tsv or .txt
+          <input type="file" id="file-input" accept=".xlsx,.xls,.csv,.tsv,.txt">
+        </label>
+        <div class="btn-group">
+          <button class="btn btn-primary" id="run-btn" disabled>&#9654; run pair mode</button>
+          <button class="btn btn-secondary" id="example-btn">load example</button>
+          <button class="btn btn-secondary" id="clear-btn">&#10005; clear</button>
+        </div>
+      </div>
+      <div class="status" id="engine-status">loading primer3 engine&hellip;</div>
+      <div class="messages" id="messages"></div>
+    </div>
+  </section>
+
+  <section class="card hidden" id="progress-card">
+    <div class="card-body">
+      <div class="status" id="progress-status">computing&hellip;</div>
+      <div class="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+    </div>
+  </section>
+
+  <section class="card hidden" id="results-section">
+    <div class="card-header">
+      results
+      <div class="btn-group">
+        <div class="dl-wrap">
+          <button class="btn btn-sm btn-secondary" data-menu="table-dl">&#11015; table &#9660;</button>
+          <div class="dl-menu" id="table-dl">
+            <button data-table="xlsx">Excel (.xlsx)</button>
+            <button data-table="tsv">tab-separated (.tsv)</button>
+            <button data-table="csv">comma-separated (.csv)</button>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-secondary" id="dl-alignments">&#11015; alignments (.txt)</button>
+        <button class="btn btn-sm btn-secondary hidden" id="dl-summary">&#11015; primer summary (.tsv)</button>
+      </div>
+    </div>
+    <div class="summary-bar" id="summary-bar"></div>
+    <div class="result-tabs hidden" id="result-tabs">
+      <button class="result-tab active" data-rtab="pairs">pair results</button>
+      <button class="result-tab" data-rtab="summary">primer summary</button>
+    </div>
+    <div id="rpane-pairs">
+      <div class="table-wrap">
+        <table>
+          <thead id="results-thead"></thead>
+          <tbody id="results-tbody"></tbody>
+        </table>
+      </div>
+      <div class="more-rows hidden" id="more-rows"></div>
+    </div>
+    <div id="rpane-summary" class="hidden">
+      <p class="hint" style="padding:8px 16px 0">primers ranked by the number of flagged heterodimers they take part in (&Delta;G &lt; threshold).</p>
+      <div class="table-wrap">
+        <table>
+          <thead id="summary-thead"></thead>
+          <tbody id="summary-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<main id="page-info" class="hidden">
+  <section class="card">
+    <div class="card-header">overview</div>
+    <div class="card-body info-section">
+      <p><strong>DimerDetective</strong> predicts primer dimer formation from the 3&prime; end stability of every primer
+      combination. Primer dimers form when the 3&prime; end of one primer hybridizes to another primer (or to itself), leading
+      to spurious amplification products and lower PCR efficiency. A more negative &Delta;G means a more stable dimer and a higher risk.</p>
+      <p>Everything runs in your browser: your sequences are never sent to a server. <strong>Pair mode</strong> analyses defined
+      primer pairs; <strong>multiplex mode</strong> tests every primer in a set against every other primer.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">thermodynamic model</div>
+    <div class="card-body info-section">
+      <p>Free energies are computed with the <code>calc_end_stability</code> function of primer3 (Untergasser et al. 2012):
+      the <code>thal</code> dynamic programming algorithm in alignment mode <code>END1</code>, with Watson&ndash;Crick nearest-neighbor
+      stacks, mismatch stacks, dangling ends, internal loops and bulge loops. The C source of <code>thal</code> and its parameter
+      files are taken unchanged from primer3-py 2.4.0 and compiled to WebAssembly, so the web app and the Python script run the
+      same code and give identical &Delta;G values. The alignment shown is the structure found in that same computation.</p>
+      <p>Nearest-neighbor parameters follow SantaLucia (1998).</p>
+      <h3>reaction conditions</h3>
+      <p>These match the calibration and are fixed, so that results stay comparable across studies.</p>
+      <table class="info-table">
+        <thead><tr><th>parameter</th><th>value</th></tr></thead>
+        <tbody>
+          <tr><td>monovalent cations (Na<sup>+</sup>)</td><td>50 mM</td></tr>
+          <tr><td>divalent cations (Mg<sup>2+</sup>)</td><td>1.5 mM</td></tr>
+          <tr><td>dNTP</td><td>0.6 mM</td></tr>
+          <tr><td>primer (DNA)</td><td>50 nM</td></tr>
+          <tr><td>temperature</td><td>37 &deg;C</td></tr>
+          <tr><td>maximum loop size</td><td>30 nt</td></tr>
+        </tbody>
+      </table>
+      <h3>salt correction</h3>
+      <p>&Delta;S<sub>corrected</sub> = &Delta;S + 0.368 &times; (N &minus; 1) &times; ln(([Na<sup>+</sup>] + 120 &times; &radic;[free Mg<sup>2+</sup>]) / 1000),
+      with concentrations in mM, N the number of base pairs in the duplex and [free Mg<sup>2+</sup>] = max(0, [Mg<sup>2+</sup>] &minus; [dNTP]).</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">scoring metrics</div>
+    <div class="card-body info-section">
+      <p>For each primer pair, six 3&prime; end free energies are computed. &ldquo;Left&rdquo; and &ldquo;right&rdquo; refer to the order of the
+      two primers and say nothing about their role (sense or antisense).</p>
+      <table class="info-table">
+        <thead><tr><th>metric</th><th>definition</th></tr></thead>
+        <tbody>
+          <tr><td><code>end_left-right_dg</code></td><td>&Delta;G (kcal/mol) for the 3&prime; end of the left primer annealed to the right primer</td></tr>
+          <tr><td><code>end_right-left_dg</code></td><td>&Delta;G (kcal/mol) for the 3&prime; end of the right primer annealed to the left primer</td></tr>
+          <tr><td><code>min_end_hetero</code></td><td>minimum of both: the heterodimer risk metric used for classification</td></tr>
+          <tr><td><code>end_left-left_dg</code></td><td>&Delta;G (kcal/mol) for the 3&prime; end of the left primer annealed to itself</td></tr>
+          <tr><td><code>end_right-right_dg</code></td><td>&Delta;G (kcal/mol) for the 3&prime; end of the right primer annealed to itself</td></tr>
+          <tr><td><code>min_end_homo</code></td><td>minimum of both self-dimer values</td></tr>
+        </tbody>
+      </table>
+      <p>The direction with the lower &Delta;G is the dominant direction; its alignment is shown first. Classification uses
+      <code>min_end_hetero</code> only: the training data held no evidence that homodimers contribute to no-template control
+      signal, so <code>min_end_homo</code> is reported for completeness but carries no validated predictive weight.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">calibration and risk tiers</div>
+    <div class="card-body info-section">
+      <p>The model was calibrated on 200 RT-qPCR reactions (100 confirmed dimers, 100 clean pairs; data courtesy of Biogazelle):
+      250 nM of each primer, SsoAdvanced Universal SYBR Green Supermix, 45 cycles, 60 &deg;C annealing, evaluated in no-template
+      control (NTC) reactions. A positive NTC signal defined a dimer. Area under the ROC curve: <strong>0.939</strong>.</p>
+      <table class="info-table">
+        <thead><tr><th><code>min_end_hetero</code> threshold</th><th>criterion</th><th>sensitivity</th><th>specificity</th></tr></thead>
+        <tbody>
+          <tr><td>&lt; &minus;2.44 kcal/mol</td><td>100% specificity</td><td>82%</td><td>100%</td></tr>
+          <tr><td>&lt; &minus;1.00 kcal/mol</td><td>95% sensitivity (default)</td><td>95%</td><td>55%</td></tr>
+          <tr><td>&lt; &minus;0.27 kcal/mol</td><td>100% sensitivity</td><td>100%</td><td>28%</td></tr>
+        </tbody>
+      </table>
+      <table class="info-table">
+        <thead><tr><th><code>min_end_hetero</code> range</th><th>risk tier</th><th>dimer rate in training data</th></tr></thead>
+        <tbody>
+          <tr class="risk-high"><td>&lt; &minus;2.44 kcal/mol</td><td><span class="badge badge-high">high risk</span></td><td>100% (82 dimers, 0 clean)</td></tr>
+          <tr class="risk-medium"><td>&minus;2.44 to &minus;0.27 kcal/mol</td><td><span class="badge badge-medium">medium risk</span></td><td>20% (18 dimers, 72 clean)</td></tr>
+          <tr class="risk-low"><td>&gt; &minus;0.27 kcal/mol</td><td><span class="badge badge-low">low risk</span></td><td>0% (0 dimers, 28 clean)</td></tr>
+        </tbody>
+      </table>
+      <div class="figs">
+        <figure><img src="img/fig_sens_spec.svg" alt="Sensitivity and specificity as a function of the threshold" loading="lazy"><figcaption>sensitivity and specificity as a function of the threshold</figcaption></figure>
+        <figure><img src="img/fig_boxplot.svg" alt="min_end_hetero for clean and dimer pairs" loading="lazy"><figcaption>min_end_hetero for clean pairs and confirmed dimers</figcaption></figure>
+        <figure><img src="img/fig_roc.svg" alt="ROC curve" loading="lazy"><figcaption>ROC curve (AUC 0.939)</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">alignments</div>
+    <div class="card-body info-section">
+      <p>Each entry shows the dominant direction first, then the other direction (one diagram for homodimers):</p>
+      <div class="align-block">5'-[top strand, 5'&rarr;3']-3'
+   [match string]
+3'-[bottom strand, 3'&rarr;5' left to right]-5'</div>
+      <p style="margin-top:8px"><code>|</code> is a Watson&ndash;Crick pair; <code>.</code> on a strand is a bulge (a nucleotide looping
+      out opposite the other strand); <code>.</code> in the match string is a paired mismatch. Example
+      (&Delta;G = &minus;2.65 kcal/mol, high risk), with a bulged T on the top strand:</p>
+      <div class="align-block">5'-CTCTATGTGTTGGAGTCAT.GAAG-3'
+               ||| |   ||||
+3'-         TTACTCGGAGTCTTCCTTAC-5'</div>
+      <p style="margin-top:8px">The diagram is the structure primer3 used to compute the reported &Delta;G, including bulges and internal loops.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">input and output</div>
+    <div class="card-body info-section">
+      <h3>pair mode</h3>
+      <ul>
+        <li>four columns: <code>left ID</code> <code>left sequence</code> <code>right ID</code> <code>right sequence</code>; IDs are optional</li>
+        <li>recognised column names (case-insensitive) include <code>forward_primer_name</code>, <code>forward_primer</code>, <code>reverse_primer_name</code>, <code>reverse_primer</code> and <code>outcome</code></li>
+      </ul>
+      <h3>multiplex mode</h3>
+      <ul>
+        <li>one primer per row: <code>ID</code> and <code>sequence</code>, or the sequence only (IDs P001, P002, &hellip; are generated)</li>
+        <li>recognised column names include <code>primer_name</code>, <code>primer_id</code>, <code>name</code>, <code>id</code>, <code>primer_seq</code>, <code>sequence</code> and <code>seq</code></li>
+        <li>N primers give N &times; (N &minus; 1) / 2 heterodimers plus N homodimers</li>
+      </ul>
+      <h3>general</h3>
+      <ul>
+        <li>separators: tab, comma or semicolon; files: .xlsx, .csv, .tsv, .txt; lines starting with <code>#</code> are ignored</li>
+        <li>sequences may contain A, C, G and T only (case-insensitive)</li>
+        <li>downloads: the results table (.xlsx, .tsv, .csv) and the alignment report (.txt) have the same layout as the Python script output</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-header">software and citation</div>
+    <div class="card-body info-section">
+      <p>DimerDetective is open source (GPL-2.0) at <a href="https://github.com/jvdesomp/DimerDetective">github.com/jvdesomp/DimerDetective</a>,
+      with the Python command-line script that gives the same results.</p>
+      <p>References: SantaLucia J (1998) <em>PNAS</em> 95:1460&ndash;1465. Untergasser A, Cutcutache I, Koressaar T, Ye J, Faircloth BC,
+      Remm M, Rozen SG (2012) Primer3, new capabilities and interfaces. <em>Nucleic Acids Res</em> 40:e115.</p>
+    </div>
+  </section>
+</main>
+
+<div class="footer">&copy; Ghent University 2026 &middot; DimerDetective <span class="version"></span> &middot;
+  thermodynamics by <a href="https://github.com/primer3-org/primer3">primer3</a> via <a href="https://github.com/libnano/primer3-py">primer3-py</a> 2.4.0, compiled to WebAssembly &middot;
+  <a href="https://github.com/jvdesomp/DimerDetective">source code</a></div>
+</div>
+</body>
+</html>

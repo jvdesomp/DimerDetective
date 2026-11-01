@@ -1,0 +1,67 @@
+# Compile primer3's thal.c to WebAssembly, check it against primer3-py
+# reference values and publish the web app on GitHub Pages.
+name: build and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 6.0.13
+
+      - name: compile thal.c to WebAssembly
+        run: bash wasm/build.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: check against primer3-py values
+        run: node tests/smoke.js
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: compare with the Python script
+        run: |
+          pip install primer3-py==2.4.0 pandas openpyxl
+          python tests/validate.py --mode pairs tests/example_pairs.csv
+          python tests/validate.py --mode multiplex tests/example_primers.csv
+
+      - uses: actions/configure-pages@v5
+        if: github.event_name != 'pull_request'
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: web
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

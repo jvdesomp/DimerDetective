@@ -67,7 +67,7 @@ Then open http://localhost:8000.
 
 ## Deployment
 
-Every push to `main` triggers the GitHub Actions workflow. It compiles `thal.c` with Emscripten 6.0.13, checks the result against primer3-py values and against the Python script, and publishes `web/` to GitHub Pages. One-time setup: in the repository settings, go to **Pages** and set **Source** to **GitHub Actions**.
+Every push to `main` triggers the GitHub Actions workflow. It compiles `thal.c` with Emscripten 6.0.13, checks the result against primer3-py values and against the Python script, stamps the links to the script and style files with the commit (so browsers load each new version instead of a cached one), and publishes `web/` to GitHub Pages. One-time setup: in the repository settings, go to **Pages** and set **Source** to **GitHub Actions**.
 
 ## Python script
 

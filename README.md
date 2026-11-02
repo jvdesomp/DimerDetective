@@ -85,6 +85,17 @@ DimerDetective version 1.2, Jo Vandesompele, Ghent University, https://jvdesomp.
 
 Every output file of the web app and the script states the version and build, for example `1.2 (build 20261102-0058)`: in the header of the alignment report and in a final `version` column of the tables. The build is the date and time (Belgian time, YYYYMMDD-hhmm) of the last change; small changes keep version 1.2 and get a new build. The web app shows the build in its footer; the script prints it, also with `--version`.
 
+## Software versions
+
+The results reported here were obtained with:
+
+- DimerDetective 1.2 (build 20261102-0115): web app and Python script
+- primer3-py 2.4.0, which includes libprimer3 release 2.6.1: `calc_end_stability` and `thal.c` (the latter compiled unchanged for the web app)
+- Emscripten 6.0.13: compilation of `thal.c` to WebAssembly
+- Python 3.13.5 with pandas 3.1.0 and openpyxl 3.1.5: Python script (the automated checks also use Python 3.12)
+- SheetJS 0.20.3: Excel import and export in the web app
+- matplotlib 3.11.2: calibration figures
+
 ## License and references
 
 GPL-2.0, as primer3 and primer3-py. © Ghent University 2026.

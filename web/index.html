@@ -281,7 +281,8 @@
       <h3>pair mode</h3>
       <ul>
         <li>four columns: <code>left ID</code> <code>left sequence</code> <code>right ID</code> <code>right sequence</code>; IDs are optional</li>
-        <li>recognized column names (case-insensitive) include <code>forward_primer_name</code>, <code>forward_primer</code>, <code>reverse_primer_name</code>, <code>reverse_primer</code> and <code>outcome</code></li>
+        <li>recognized column names (case-insensitive) include <code>forward_primer_name</code>, <code>left_primer_name</code>, <code>forward_primer</code>, <code>left_primer</code>, the <code>reverse_</code> and <code>right_</code> equivalents, and <code>outcome</code> (or <code>label</code>, <code>class</code>, <code>result</code>, <code>status</code>)</li>
+        <li>missing IDs are generated as FWD_1, FWD_2, &hellip; and REV_1, REV_2, &hellip;</li>
       </ul>
       <h3>multiplex mode</h3>
       <ul>
@@ -314,6 +315,11 @@
     <div class="card-body info-section">
       <p>DimerDetective is open source (GPL-2.0) at <a href="https://github.com/jvdesomp/DimerDetective">github.com/jvdesomp/DimerDetective</a>,
       with the Python command-line script that gives the same results.</p>
+      <p>Software versions used for the results reported here: DimerDetective 1.2 (build 20261102-0115); primer3-py 2.4.0,
+      which includes libprimer3 release 2.6.1 (<code>calc_end_stability</code> and <code>thal.c</code>, the latter compiled unchanged
+      for this web app); Emscripten 6.0.13 (compilation to WebAssembly); Python 3.13.5 with pandas 3.1.0 and openpyxl 3.1.5
+      (Python script; the automated checks also use Python 3.12); SheetJS 0.20.3 (Excel import and export); matplotlib 3.11.2
+      (calibration figures).</p>
       <p>References: SantaLucia J (1998) <em>PNAS</em> 95:1460&ndash;1465. Untergasser A, Cutcutache I, Koressaar T, Ye J, Faircloth BC,
       Remm M, Rozen SG (2012) Primer3, new capabilities and interfaces. <em>Nucleic Acids Res</em> 40:e115.</p>
     </div>

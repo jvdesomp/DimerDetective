@@ -109,7 +109,7 @@ import primer3
 # change in Belgian time, YYYYMMDD-hhmm). Must equal VERSION and BUILD in
 # web/dd-core.js; both are written into every output file.
 VERSION = '1.2'
-BUILD = '20261102-0115'
+BUILD = '20261102-0157'
 VERSION_LABEL = f"{VERSION} (build {BUILD})"
 
 # ntthal binary (part of the primer3 package) — fallback for alignments when
@@ -483,7 +483,7 @@ def format_multiplex_entry(pair_type, id_a, seq_a, id_b, seq_b,
         lines.append(f"{id_a} / {id_a}  [homodimer]")
         lines.append('')
         lines.append(f"  predicted: {'dimer' if result['min_end_hetero'] < threshold else 'clean'}")
-        lines.append(f"  min_end_homo = {result['min_end_hetero']:7.3f} kcal/mol")
+        lines.append(f"  end_self_dg = {result['end_left-left_dg']:7.3f} kcal/mol")
         lines.append('')
         lines.append(f"  {id_a}: 5'-{seq_a}-3'")
         lines.append('')
@@ -496,9 +496,6 @@ def format_multiplex_entry(pair_type, id_a, seq_a, id_b, seq_b,
         lines.append(f"  end_left-right_dg = {result['end_left-right_dg']:7.3f} kcal/mol  (3' of {id_a} vs {id_b})")
         lines.append(f"  end_right-left_dg = {result['end_right-left_dg']:7.3f} kcal/mol  (3' of {id_b} vs {id_a})")
         lines.append(f"  min_end_hetero    = {result['min_end_hetero']:7.3f} kcal/mol  ← dominant ({dominant_id} 3'-end)")
-        lines.append(f"  end_left-left_dg  = {result['end_left-left_dg']:7.3f} kcal/mol  (3' of {id_a} vs {id_a})")
-        lines.append(f"  end_right-right_dg= {result['end_right-right_dg']:7.3f} kcal/mol  (3' of {id_b} vs {id_b})")
-        lines.append(f"  min_end_homo      = {result['min_end_homo']:7.3f} kcal/mol")
         lines.append('')
         lines.append(f"  {id_a}: 5'-{seq_a}-3'")
         lines.append(f"  {id_b}: 5'-{seq_b}-3'")
@@ -883,18 +880,19 @@ def run_multiplex(args):
     tsv_rows = []
     for pair_type, id_a, seq_a, id_b, seq_b, result in entries:
         flagged = 'YES' if result['min_end_hetero'] < args.threshold else 'NO'
+        homo = pair_type == 'homodimer'
         tsv_rows.append({
             'type':               pair_type,
             'id_A':               id_a,
             'seq_A':              seq_a,
             'id_B':               id_b,
             'seq_B':              seq_b,
-            'end_left-right_dg':  round(result['end_left-right_dg'],  4),
-            'end_right-left_dg':  round(result['end_right-left_dg'],  4),
-            'min_end_hetero':     round(result['min_end_hetero'],      4),
-            'end_left-left_dg':   round(result['end_left-left_dg'],   4),
-            'end_right-right_dg': round(result['end_right-right_dg'], 4),
-            'min_end_homo':       round(result['min_end_homo'],        4),
+            # heterodimer rows: the three heterodimer values; homodimer rows:
+            # one self-dimer value (end_self_dg), the others left empty
+            'end_left-right_dg':  None if homo else round(result['end_left-right_dg'], 4),
+            'end_right-left_dg':  None if homo else round(result['end_right-left_dg'], 4),
+            'min_end_hetero':     None if homo else round(result['min_end_hetero'],    4),
+            'end_self_dg':        round(result['end_left-left_dg'], 4) if homo else None,
             'flagged':            flagged,
             'version':            VERSION_LABEL,
         })

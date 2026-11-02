@@ -19,7 +19,7 @@
   // Belgian time, YYYYMMDD-hhmm). Must equal VERSION and BUILD in
   // python/make_primer_alignments.py; both go into every output file.
   const VERSION = '1.2';
-  const BUILD = '20261102-0115';
+  const BUILD = '20261102-0157';
   const VERSION_LABEL = `${VERSION} (build ${BUILD})`;
 
   // Reaction conditions used for calibration (same as PRIMER3_PARAMS).
@@ -232,7 +232,7 @@
     if (type === 'homodimer') {
       lines.push(`${idA} / ${idA}  [homodimer]`, '');
       lines.push(`  predicted: ${call}`);
-      lines.push(`  min_end_homo = ${fmt(result.min_end_hetero, 3, 7)} kcal/mol`, '');
+      lines.push(`  end_self_dg = ${fmt(result['end_left-left_dg'], 3, 7)} kcal/mol`, '');
       lines.push(`  ${idA}: 5'-${seqA}-3'`, '');
       lines.push(...alnBlock(result.aln, idA, idA));
     } else {
@@ -242,9 +242,7 @@
       lines.push(`  end_left-right_dg = ${fmt(result['end_left-right_dg'], 3, 7)} kcal/mol  (3' of ${idA} vs ${idB})`);
       lines.push(`  end_right-left_dg = ${fmt(result['end_right-left_dg'], 3, 7)} kcal/mol  (3' of ${idB} vs ${idA})`);
       lines.push(`  min_end_hetero    = ${fmt(result.min_end_hetero, 3, 7)} kcal/mol  ← dominant (${d.dominant} 3'-end)`);
-      lines.push(`  end_left-left_dg  = ${fmt(result['end_left-left_dg'], 3, 7)} kcal/mol  (3' of ${idA} vs ${idA})`);
-      lines.push(`  end_right-right_dg= ${fmt(result['end_right-right_dg'], 3, 7)} kcal/mol  (3' of ${idB} vs ${idB})`);
-      lines.push(`  min_end_homo      = ${fmt(result.min_end_homo, 3, 7)} kcal/mol`, '');
+      lines.push('');
       lines.push(`  ${idA}: 5'-${seqA}-3'`);
       lines.push(`  ${idB}: 5'-${seqB}-3'`, '');
       lines.push(...alnBlock(result.aln, d.domTop, d.domBot), '');
@@ -593,19 +591,22 @@
   function multiplexTable(sorted, threshold) {
     return sorted.map(e => {
       const r = e.result;
+      const homo = e.type === 'homodimer';
       return {
         type: e.type, id_A: e.idA, seq_A: e.seqA, id_B: e.idB, seq_B: e.seqB,
-        'end_left-right_dg': r['end_left-right_dg'], 'end_right-left_dg': r['end_right-left_dg'],
-        min_end_hetero: r.min_end_hetero,
-        'end_left-left_dg': r['end_left-left_dg'], 'end_right-right_dg': r['end_right-right_dg'],
-        min_end_homo: r.min_end_homo,
+        // heterodimer rows: the three heterodimer values; homodimer rows:
+        // one self-dimer value (end_self_dg), the others left empty
+        'end_left-right_dg': homo ? null : r['end_left-right_dg'],
+        'end_right-left_dg': homo ? null : r['end_right-left_dg'],
+        min_end_hetero: homo ? null : r.min_end_hetero,
+        end_self_dg: homo ? r['end_left-left_dg'] : null,
         flagged: r.min_end_hetero < threshold ? 'YES' : 'NO',
         version: VERSION_LABEL,
       };
     });
   }
 
-  const DG_COLS = ['end_left-right_dg', 'end_right-left_dg', 'min_end_hetero', 'end_left-left_dg', 'end_right-right_dg', 'min_end_homo'];
+  const DG_COLS = ['end_left-right_dg', 'end_right-left_dg', 'min_end_hetero', 'end_left-left_dg', 'end_right-right_dg', 'min_end_homo', 'end_self_dg'];
 
   // Delimited text like pandas to_csv (values rounded to 4 decimals).
   function tableToText(table, sep) {
@@ -617,7 +618,7 @@
       return s;
     };
     const lines = [cols.join(sep)];
-    table.forEach(row => lines.push(cols.map(c => cell(DG_COLS.includes(c) ? pyRound4(row[c]) : row[c])).join(sep)));
+    table.forEach(row => lines.push(cols.map(c => cell(row[c] === null ? '' : DG_COLS.includes(c) ? pyRound4(row[c]) : row[c])).join(sep)));
     return lines.join('\n') + '\n';
   }
 
@@ -625,7 +626,7 @@
   function tableToAoa(table) {
     if (!table.length) return [];
     const cols = Object.keys(table[0]);
-    return [cols].concat(table.map(row => cols.map(c => (DG_COLS.includes(c) ? Number(row[c].toFixed(4)) : row[c]))));
+    return [cols].concat(table.map(row => cols.map(c => (row[c] === null ? null : DG_COLS.includes(c) ? Number(row[c].toFixed(4)) : row[c]))));
   }
 
   function riskTier(dg) {

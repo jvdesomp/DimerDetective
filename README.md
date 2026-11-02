@@ -22,7 +22,7 @@ The info tab has a contact form (email address, subject, message; no file upload
 
 ## Homodimers: not validated
 
-Classification uses `min_end_hetero` only. Homodimer values (`end_left-left_dg`, `end_right-right_dg`, `min_end_homo` and homodimer rows) are reported for completeness, but they are not validated. In the Biogazelle training data, the no-template control (NTC) signal cannot tell homodimers from heterodimers, and predicted homodimers had no predictive value:
+Classification uses `min_end_hetero` only. Homodimer values (`end_left-left_dg`, `end_right-right_dg` and `min_end_homo` in pair mode; `end_self_dg` and the homodimer rows in multiplex mode) are reported for completeness, but they are not validated. In multiplex mode, each primer's self-dimer is reported once, in its homodimer row (`end_self_dg`); heterodimer rows do not repeat it. In the Biogazelle training data, the no-template control (NTC) signal cannot tell homodimers from heterodimers, and predicted homodimers had no predictive value:
 
 - `min_end_homo` gave an AUC of 0.60, against 0.94 for `min_end_hetero`, and added nothing to `min_end_hetero` in a logistic model (p = 0.30).
 - 7 of the 100 clean pairs had a strong predicted homodimer (below −2.44 kcal/mol, down to −6.46 kcal/mol) without any NTC signal.
@@ -89,7 +89,7 @@ Every output file of the web app and the script states the version and build, fo
 
 The results reported here were obtained with:
 
-- DimerDetective 1.2 (build 20261102-0115): web app and Python script
+- DimerDetective 1.2 (build 20261102-0157): web app and Python script
 - primer3-py 2.4.0, which includes libprimer3 release 2.6.1: `calc_end_stability` and `thal.c` (the latter compiled unchanged for the web app)
 - Emscripten 6.0.13: compilation of `thal.c` to WebAssembly
 - Python 3.13.5 with pandas 3.1.0 and openpyxl 3.1.5: Python script (the automated checks also use Python 3.12)

@@ -199,7 +199,7 @@
     <div class="card-header">scoring metrics</div>
     <div class="card-body info-section">
       <p>For each primer pair, six 3&prime; end free energies are computed. &ldquo;Left&rdquo; and &ldquo;right&rdquo; refer to the order of the
-      two primers and say nothing about their role (sense or antisense).</p>
+      two primers and say nothing about their role (sense or antisense). In pair mode, all six are reported for each pair.</p>
       <table class="info-table">
         <thead><tr><th>metric</th><th>definition</th></tr></thead>
         <tbody>
@@ -211,6 +211,9 @@
           <tr><td><code>min_end_homo</code></td><td>minimum of both self-dimer values</td></tr>
         </tbody>
       </table>
+      <p>In multiplex mode, heterodimer rows report <code>end_left-right_dg</code>, <code>end_right-left_dg</code> and
+      <code>min_end_hetero</code>. Each primer's self-dimer is reported once, in its homodimer row, as <code>end_self_dg</code>
+      (&Delta;G for the 3&prime; end of the primer annealed to itself); the heterodimer columns are empty in those rows.</p>
       <p>The direction with the lower &Delta;G is the dominant direction; its alignment is shown first. Classification uses
       <code>min_end_hetero</code> only.</p>
       <div class="warning" id="homodimer-warning">
@@ -222,8 +225,8 @@
           <li>7 of the 100 clean pairs had a strong predicted homodimer (below &minus;2.44 kcal/mol, down to &minus;6.46 kcal/mol)
           without any NTC signal</li>
         </ul>
-        <p>Homodimer values (<code>end_left-left_dg</code>, <code>end_right-right_dg</code>, <code>min_end_homo</code> and homodimer
-        rows) are reported for completeness only. Interpret them with caution.</p>
+        <p>Homodimer values (<code>end_left-left_dg</code>, <code>end_right-right_dg</code> and <code>min_end_homo</code> in pair mode,
+        <code>end_self_dg</code> and the homodimer rows in multiplex mode) are reported for completeness only. Interpret them with caution.</p>
       </div>
     </div>
   </section>
@@ -315,7 +318,7 @@
     <div class="card-body info-section">
       <p>DimerDetective is open source (GPL-2.0) at <a href="https://github.com/jvdesomp/DimerDetective">github.com/jvdesomp/DimerDetective</a>,
       with the Python command-line script that gives the same results.</p>
-      <p>Software versions used for the results reported here: DimerDetective 1.2 (build 20261102-0115); primer3-py 2.4.0,
+      <p>Software versions used for the results reported here: DimerDetective 1.2 (build 20261102-0157); primer3-py 2.4.0,
       which includes libprimer3 release 2.6.1 (<code>calc_end_stability</code> and <code>thal.c</code>, the latter compiled unchanged
       for this web app); Emscripten 6.0.13 (compilation to WebAssembly); Python 3.13.5 with pandas 3.1.0 and openpyxl 3.1.5
       (Python script; the automated checks also use Python 3.12); SheetJS 0.20.3 (Excel import and export); matplotlib 3.11.2

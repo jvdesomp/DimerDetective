@@ -109,7 +109,7 @@ import primer3
 # change in Belgian time, YYYYMMDD-hhmm). Must equal VERSION and BUILD in
 # web/dd-core.js; both are written into every output file.
 VERSION = '1.2'
-BUILD = '20261102-0157'
+BUILD = '20261102-0209'
 VERSION_LABEL = f"{VERSION} (build {BUILD})"
 
 # ntthal binary (part of the primer3 package) — fallback for alignments when
@@ -533,24 +533,144 @@ def find_col(df, candidates):
 
 _DNA_PAT = re.compile(r'^[ATGCUNatgcun\-]+$')
 
+# Column names are optional. Sequence columns are recognized by their content,
+# each ID column as the non-sequence column next to its sequence column, and
+# the outcome column as a column holding only "dimer" and "clean". Recognized
+# names (below) take precedence. Mirrors parsePairs / parsePrimerList in
+# web/dd-core.js; both must stay identical.
+
+PAIR_NAMES = {
+    'fwd_name': ['forward_primer_name', 'fwd_name', 'fwd_id', 'forward_name', 'forward_id',
+                 'left_primer_name', 'left_name', 'left_id', 'left-id', 'Forward Primer Name'],
+    'fwd_seq':  ['forward_primer', 'forward_primer_seq', 'forward_primer_sequence',
+                 'forward_sequence', 'fwd', 'fwd_seq', 'left_primer', 'left_primer_seq',
+                 'left_primer_sequence', 'left_sequence', 'left-sequence', 'left-primer',
+                 'Forward Primer Seq', 'Forward Primer'],
+    'rev_name': ['reverse_primer_name', 'rev_name', 'rev_id', 'reverse_name', 'reverse_id',
+                 'right_primer_name', 'right_name', 'right_id', 'right-id', 'Reverse Primer Name'],
+    'rev_seq':  ['reverse_primer', 'reverse_primer_seq', 'reverse_primer_sequence',
+                 'reverse_sequence', 'rev', 'rev_seq', 'right_primer', 'right_primer_seq',
+                 'right_primer_sequence', 'right_sequence', 'right-sequence', 'right-primer',
+                 'Reverse Primer Seq', 'Reverse Primer'],
+    'outcome':  ['outcome', 'label', 'class', 'result', 'status'],
+}
+LIST_NAMES = {
+    'seq': ['primer_seq', 'primer_sequence', 'sequence', 'seq'],
+    'id':  ['primer_name', 'primer_id', 'name', 'id'],
+}
+OUTCOME_VALUES = {'dimer', 'clean'}
+
+
 def _looks_like_dna(val, min_len=6):
     """Return True if val is a plausible DNA/RNA sequence."""
     s = str(val).strip()
     return len(s) >= min_len and bool(_DNA_PAT.match(s))
 
+def _is_missing(v):
+    return v is None or (isinstance(v, float) and v != v) or str(v).strip().lower() in ('', 'nan', 'none')
+
 def _dna_fraction(series, min_len=6):
-    """Fraction of non-null values in series that look like DNA sequences."""
-    vals = series.dropna().astype(str).str.strip()
-    return sum(_looks_like_dna(v, min_len) for v in vals) / len(vals) if len(vals) else 0.0
+    """Fraction of non-missing values in series that look like DNA sequences."""
+    vals = [str(v).strip() for v in series if not _is_missing(v)]
+    return sum(_looks_like_dna(v, min_len) for v in vals) / len(vals) if vals else 0.0
+
+def _cell_id(v):
+    """Identifier text of a cell (1.0 → '1'), or None when empty."""
+    if _is_missing(v):
+        return None
+    s = str(v).strip()
+    if re.fullmatch(r'-?\d+\.0+', s):
+        s = str(int(float(s)))
+    return s
+
+def _read_table(path):
+    """Read .csv or Excel; the first row is a header unless it holds a sequence."""
+    read_fn = pd.read_csv if path.lower().endswith('.csv') else pd.read_excel
+    df = read_fn(path)
+    if any(_looks_like_dna(c) for c in df.columns):
+        df = read_fn(path, header=None)
+    return df
+
+def _dna_columns(df):
+    """Columns that hold sequences (>= 80% DNA), in table order."""
+    return [c for c in df.columns if _dna_fraction(df[c]) >= 0.8]
+
+def _outcome_column(df, exclude):
+    col = find_col(df, PAIR_NAMES['outcome'])
+    if col is not None:
+        return col
+    for c in df.columns:
+        if c in exclude:
+            continue
+        vals = [str(v).strip().lower() for v in df[c] if not _is_missing(v)]
+        if vals and all(v in OUTCOME_VALUES for v in vals):
+            return c
+    return None
+
+def _id_column_next_to(df, seq_col, taken):
+    """The non-sequence column directly left of seq_col, else directly right."""
+    cols = list(df.columns)
+    i = cols.index(seq_col)
+    for j in (i - 1, i + 1):
+        if 0 <= j < len(cols) and cols[j] not in taken and _dna_fraction(df[cols[j]]) < 0.5:
+            return cols[j]
+    return None
+
+
+def _pair_columns(df, required=True):
+    """Locate the name, sequence and outcome columns of a primer pair table."""
+    fwd_name = find_col(df, PAIR_NAMES['fwd_name'])
+    fwd_seq  = find_col(df, PAIR_NAMES['fwd_seq'])
+    rev_name = find_col(df, PAIR_NAMES['rev_name'])
+    rev_seq  = find_col(df, PAIR_NAMES['rev_seq'])
+    if fwd_seq is None or rev_seq is None:
+        dna = [c for c in _dna_columns(df) if c not in (fwd_seq, rev_seq)]
+        if fwd_seq is None and dna:
+            fwd_seq = dna.pop(0)
+        if rev_seq is None and dna:
+            rev_seq = dna.pop(0)
+    if fwd_seq is None or rev_seq is None:
+        if required:
+            sys.exit(
+                "ERROR: could not find two primer sequence columns (left and right).\n"
+                f"Available columns: {list(df.columns)}\n"
+                "Columns are recognized by content (DNA sequences) or by name, "
+                "for example forward_primer and reverse_primer."
+            )
+        return None, None, None, None, None
+    outcome = _outcome_column(df, {fwd_seq, rev_seq, fwd_name, rev_name})
+    taken = {fwd_seq, rev_seq, outcome, fwd_name, rev_name} - {None}
+    if fwd_name is None:
+        fwd_name = _id_column_next_to(df, fwd_seq, taken)
+        taken.add(fwd_name)
+    if rev_name is None:
+        rev_name = _id_column_next_to(df, rev_seq, taken)
+    return fwd_name, fwd_seq, rev_name, rev_seq, outcome
+
+
+def _read_pairs(df):
+    """Rows of a primer pair table as dicts (empty rows skipped)."""
+    fwd_name, fwd_seq, rev_name, rev_seq, outcome = _pair_columns(df)
+    rows = []
+    for i, (_, r) in enumerate(df.iterrows()):
+        if _is_missing(r[fwd_seq]) and _is_missing(r[rev_seq]):
+            continue
+        rows.append({
+            'fwd_name': (_cell_id(r[fwd_name]) if fwd_name is not None else None) or f"FWD_{i + 1}",
+            'rev_name': (_cell_id(r[rev_name]) if rev_name is not None else None) or f"REV_{i + 1}",
+            'fwd':      str(r[fwd_seq]).strip(),
+            'rev':      str(r[rev_seq]).strip(),
+            'outcome':  None if outcome is None or _is_missing(r[outcome]) else str(r[outcome]).strip(),
+        })
+    return rows, outcome is not None
+
 
 def _read_primer_list(path):
     """
-    Read a flat primer list from an Excel or CSV file.  Handles four layouts:
-
-      1. Header + ID column + seq column  → columns matched by name
-      2. Header + seq column only         → IDs auto-generated as P001, P002, …
-      3. No header + 1 column             → seq detected by DNA content; IDs auto-generated
-      4. No header + 2 columns            → seq detected by DNA content; other col = ID
+    Read a primer list from an Excel or CSV file: one primer per row, with or
+    without a header row and an ID column. The sequence column is found by
+    name or content; the ID column by name or as the column next to it (IDs
+    P001, P002, ... are generated when there is none).
 
     A table of primer pairs (two sequence columns, as in pair mode) is also
     accepted: all primers of both sequence columns are then used.
@@ -560,74 +680,39 @@ def _read_primer_list(path):
     Returns (primers, notes): a list of (primer_id, primer_seq) tuples and a
     list of notes for the user (pair table used, duplicates merged).
     """
-    read_fn = pd.read_csv if path.lower().endswith('.csv') else pd.read_excel
-
-    df_peek = read_fn(path)
-
-    _label_candidates = ['primer_seq', 'primer_sequence', 'sequence', 'seq',
-                         'primer_name', 'primer_id', 'name', 'id']
-    any_recognized = find_col(df_peek, _label_candidates) is not None
-    all_dna        = all(_looks_like_dna(str(c)) for c in df_peek.columns)
-    any_dna        = any(_looks_like_dna(str(c)) for c in df_peek.columns)
-
-    has_header = any_recognized and not all_dna
-    if not has_header and not any_dna:
-        has_header = True
-
-    df = df_peek if has_header else read_fn(path, header=None)
-
-    # ── Locate the sequence column ─────────────────────────────────────────
-    seq_col = find_col(df, ['primer_seq', 'primer_sequence', 'sequence', 'seq'])
+    df = _read_table(path)
+    seq_col = find_col(df, LIST_NAMES['seq'])
     if seq_col is None:
-        pairs_df = read_fn(path)
-        f_name, f_seq, r_name, r_seq, _ = _pair_columns(pairs_df, required=False)
-        if f_seq is not None and r_seq is not None:
+        dna = _dna_columns(df)
+        if len(dna) >= 2 or (find_col(df, PAIR_NAMES['fwd_seq']) is not None
+                             and find_col(df, PAIR_NAMES['rev_seq']) is not None):
+            rows, _ = _read_pairs(df)
             found = []
-            for i, row in pairs_df.iterrows():
-                fwd, rev = str(row[f_seq]).strip(), str(row[r_seq]).strip()
-                if fwd.upper() in ('', 'NAN', 'NONE') and rev.upper() in ('', 'NAN', 'NONE'):
-                    continue
-                found.append((str(row[f_name]).strip() if f_name is not None else f"FWD_{i + 1}", fwd.upper()))
-                found.append((str(row[r_name]).strip() if r_name is not None else f"REV_{i + 1}", rev.upper()))
+            for r in rows:
+                found.append((r['fwd_name'], r['fwd'].upper()))
+                found.append((r['rev_name'], r['rev'].upper()))
             primers, notes = _unique_primers(found)
             notes.insert(0, f"primer pair table: primers from both sequence columns are used ({len(found)} primers)")
             return primers, notes
-        scores = {c: _dna_fraction(df[c]) for c in df.columns}
-        best   = max(scores, key=scores.get)
-        if scores[best] < 0.8:
+        if not dna:
             sys.exit(
-                f"ERROR: could not identify a primer sequence column.\n"
-                f"DNA-content scores per column: {scores}\n"
-                f"Tip: add a header row with a column named 'primer_seq'."
+                "ERROR: could not identify a primer sequence column.\n"
+                "Tip: add a header row with a column named 'primer_seq'."
             )
-        seq_col = best
+        seq_col = dna[0]
 
-    # ── Locate the ID column ───────────────────────────────────────────────
-    id_col = find_col(df, ['primer_name', 'primer_id', 'name', 'id', 'ID'])
+    id_col = find_col(df, LIST_NAMES['id'])
     if id_col is None:
-        others  = [c for c in df.columns if c != seq_col]
-        non_dna = [c for c in others if _dna_fraction(df[c]) < 0.5]
-        id_col  = non_dna[0] if non_dna else None
+        id_col = _id_column_next_to(df, seq_col, {seq_col})
 
-    # ── Build result list ──────────────────────────────────────────────────
-    n_rows   = len(df)
-    n_digits = len(str(n_rows))
+    n_digits = len(str(len(df)))
     primers  = []
     for _, row in df.iterrows():
-        seq = str(row[seq_col]).strip().upper()
-        if not seq or seq in ('NAN', 'NONE'):
+        if _is_missing(row[seq_col]):
             continue
-        if id_col is not None:
-            raw = row[id_col]
-            try:
-                pid = str(int(raw))
-            except (ValueError, TypeError):
-                pid = str(raw).strip()
-            if pid.lower() in ('nan', 'none', ''):
-                pid = f"P{len(primers) + 1:0{n_digits}d}"
-        else:
-            pid = f"P{len(primers) + 1:0{n_digits}d}"
-        primers.append((pid, seq))
+        seq = str(row[seq_col]).strip().upper()
+        pid = _cell_id(row[id_col]) if id_col is not None else None
+        primers.append((pid or f"P{len(primers) + 1:0{n_digits}d}", seq))
 
     return _unique_primers(primers)
 
@@ -649,76 +734,11 @@ def _unique_primers(primers):
     return kept, notes
 
 
-def _pair_columns(df, required=True):
-    """Locate the name, sequence and outcome columns of a primer pair table."""
-    col_fwd_name = find_col(df, [
-        'forward_primer_name', 'fwd_name', 'fwd_id', 'forward_name', 'forward_id',
-        'left_primer_name',    'left_name', 'left_id', 'left-id',
-        'Forward Primer Name',
-    ])
-    col_fwd_seq  = find_col(df, [
-        'forward_primer', 'forward_primer_seq', 'forward_primer_sequence',
-        'forward_sequence', 'fwd', 'fwd_seq',
-        'left_primer',    'left_primer_seq',    'left_primer_sequence',
-        'left_sequence',  'left-sequence', 'left-primer',
-        'Forward Primer Seq', 'Forward Primer',
-    ])
-    col_rev_name = find_col(df, [
-        'reverse_primer_name', 'rev_name', 'rev_id', 'reverse_name', 'reverse_id',
-        'right_primer_name',   'right_name', 'right_id', 'right-id',
-        'Reverse Primer Name',
-    ])
-    col_rev_seq  = find_col(df, [
-        'reverse_primer', 'reverse_primer_seq', 'reverse_primer_sequence',
-        'reverse_sequence', 'rev', 'rev_seq',
-        'right_primer',   'right_primer_seq',   'right_primer_sequence',
-        'right_sequence', 'right-sequence', 'right-primer',
-        'Reverse Primer Seq', 'Reverse Primer',
-    ])
-    col_outcome  = find_col(df, ['outcome', 'label', 'class', 'result', 'status'])
-
-    # ── DNA-content fallback when column names are not recognized ──────────
-    # If either sequence column was not found by name, try to identify the
-    # two sequence columns by DNA content, then assign left→fwd, right→rev.
-    if col_fwd_seq is None or col_rev_seq is None:
-        scores   = {c: _dna_fraction(df[c]) for c in df.columns}
-        dna_cols = sorted([c for c, s in scores.items() if s >= 0.8],
-                          key=lambda c: list(df.columns).index(c))
-        if len(dna_cols) >= 2:
-            col_fwd_seq = col_fwd_seq or dna_cols[0]
-            col_rev_seq = col_rev_seq or dna_cols[1]
-            # ID columns: non-DNA columns adjacent to the sequence columns
-            non_dna = [c for c in df.columns if scores[c] < 0.5
-                       and c not in (col_fwd_seq, col_rev_seq)
-                       and (col_outcome is None or c != col_outcome)]
-            if col_fwd_name is None and len(non_dna) >= 1:
-                col_fwd_name = non_dna[0]
-            if col_rev_name is None and len(non_dna) >= 2:
-                col_rev_name = non_dna[1]
-
-    for col, label in ([(col_fwd_seq, 'forward/left primer sequence'),
-                        (col_rev_seq,  'reverse/right primer sequence')] if required else []):
-        if col is None:
-            sys.exit(
-                f"ERROR: could not find column for {label}.\n"
-                f"Available columns: {list(df.columns)}\n"
-                f"Recognized name patterns: forward/fwd/left + _primer/_sequence/_seq\n"
-                f"                          reverse/rev/right + _primer/_sequence/_seq\n"
-                f"If your columns have other names, rename them or add a row with these headers."
-            )
-
-    return col_fwd_name, col_fwd_seq, col_rev_name, col_rev_seq, col_outcome
-
-
 # ── Mode: pairs ────────────────────────────────────────────────────────────
 
 def run_pairs(args):
-    if args.input.lower().endswith('.csv'):
-        df = pd.read_csv(args.input)
-    else:
-        df = pd.read_excel(args.input)
-
-    col_fwd_name, col_fwd_seq, col_rev_name, col_rev_seq, col_outcome = _pair_columns(df)
+    df = _read_table(args.input)
+    rows, has_outcome = _read_pairs(df)
 
     # ── Derive alignment output path if not given ────────────────────────
     align_path = args.alignments
@@ -727,24 +747,14 @@ def run_pairs(args):
         align_path = stem + '_alignments.txt'
 
     # ── Compute all pairs ──────────────────────────────────────────────────
-    n_pairs       = len(df)
+    n_pairs       = len(rows)
     n_flagged_het = 0
     pair_rows     = []
     tsv_rows      = []
 
-    for i, df_row in df.iterrows():
-        fwd      = str(df_row[col_fwd_seq]).strip()
-        rev      = str(df_row[col_rev_seq]).strip()
-        fwd_name = str(df_row[col_fwd_name]).strip() if col_fwd_name else f"FWD_{i + 1}"
-        rev_name = str(df_row[col_rev_name]).strip() if col_rev_name else f"REV_{i + 1}"
-        outcome  = df_row[col_outcome] if col_outcome else None
-        row = {
-            'fwd_name': fwd_name,
-            'rev_name': rev_name,
-            'fwd':      fwd,
-            'rev':      rev,
-            'outcome':  outcome,
-        }
+    for row in rows:
+        fwd, rev = row['fwd'], row['rev']
+        fwd_name, rev_name, outcome = row['fwd_name'], row['rev_name'], row['outcome']
         result  = compute_pair(fwd, rev)
         flagged = result['min_end_hetero'] < args.threshold
         if flagged:
@@ -765,7 +775,7 @@ def run_pairs(args):
             'flagged':            'YES' if flagged else 'NO',
             'predicted':          'dimer' if flagged else 'clean',
         }
-        if col_outcome:
+        if has_outcome:
             tsv_row['outcome'] = outcome
         tsv_row['version'] = VERSION_LABEL
         tsv_rows.append(tsv_row)

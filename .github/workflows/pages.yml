@@ -48,6 +48,8 @@ jobs:
           python tests/validate.py --mode multiplex tests/example_primers.csv
           python tests/validate.py --mode multiplex tests/example_pairs.csv
           python tests/validate.py --mode multiplex tests/example_primers_duplicates.csv
+          for f in tests/layouts/pairs_*.csv; do python tests/validate.py --mode pairs --type both "$f"; done
+          for f in tests/layouts/*.csv; do python tests/validate.py --mode multiplex --type both "$f"; done
 
       - name: stamp file links with the commit (browsers then load each new version)
         run: sed -i "s/?v=dev/?v=${GITHUB_SHA::7}/g" web/index.html

@@ -19,7 +19,7 @@
   // Belgian time, YYYYMMDD-hhmm). Must equal VERSION and BUILD in
   // python/make_primer_alignments.py; both go into every output file.
   const VERSION = '1.2';
-  const BUILD = '20261102-0157';
+  const BUILD = '20261102-0209';
   const VERSION_LABEL = `${VERSION} (build ${BUILD})`;
 
   // Reaction conditions used for calibration (same as PRIMER3_PARAMS).
@@ -335,6 +335,11 @@
     return { columns, data, hasHeader };
   }
 
+  // Column names are optional. Sequence columns are recognized by their
+  // content, each ID column as the non-sequence column next to its sequence
+  // column, and the outcome column as a column holding only "dimer" and
+  // "clean". Recognized names take precedence. Mirrors _pair_columns,
+  // _read_pairs and _read_primer_list in the script; both must stay identical.
   const PAIR_COLS = {
     fwdName: ['forward_primer_name', 'fwd_name', 'fwd_id', 'forward_name', 'forward_id',
       'left_primer_name', 'left_name', 'left_id', 'left-id', 'Forward Primer Name'],
@@ -348,6 +353,11 @@
       'right_sequence', 'right-sequence', 'right-primer', 'Reverse Primer Seq', 'Reverse Primer'],
     outcome: ['outcome', 'label', 'class', 'result', 'status'],
   };
+  const LIST_COLS = {
+    seq: ['primer_seq', 'primer_sequence', 'sequence', 'seq'],
+    id: ['primer_name', 'primer_id', 'name', 'id'],
+  };
+  const OUTCOME_VALUES = new Set(['dimer', 'clean']);
 
   function cleanSeq(v) { return String(v === undefined || v === null ? '' : v).replace(/\s+/g, ''); }
 
@@ -356,44 +366,76 @@
     return String(v === undefined || v === null ? '' : v).trim();
   }
 
-  // Pair mode: returns { rows: [{fwd_name, fwd, rev_name, rev, outcome}], errors, hasOutcome }
-  function parsePairs(rawRows) {
-    const { columns, data } = splitHeader(rawRows);
-    const errors = [];
+  // Identifier text of a cell ('1.0' -> '1'), or null when empty.
+  function cellId(v) {
+    if (isMissing(v)) return null;
+    let s = cellStr(v);
+    if (/^-?\d+\.0+$/.test(s)) s = String(parseInt(s, 10));
+    return s;
+  }
+
+  function dnaColumns(columns, data) {
+    return columns.map((_, i) => i).filter(i => dnaFraction(data, i) >= 0.8);
+  }
+
+  function outcomeColumn(columns, data, exclude) {
+    const named = findCol(columns, PAIR_COLS.outcome);
+    if (named !== null) return named;
+    for (let c = 0; c < columns.length; c++) {
+      if (exclude.has(c)) continue;
+      const vals = data.map(r => r[c]).filter(v => !isMissing(v)).map(v => String(v).trim().toLowerCase());
+      if (vals.length && vals.every(v => OUTCOME_VALUES.has(v))) return c;
+    }
+    return null;
+  }
+
+  // The non-sequence column directly left of seqCol, else directly right.
+  function idColumnNextTo(columns, data, seqCol, taken) {
+    for (const j of [seqCol - 1, seqCol + 1]) {
+      if (j >= 0 && j < columns.length && !taken.has(j) && dnaFraction(data, j) < 0.5) return j;
+    }
+    return null;
+  }
+
+  function pairColumns(columns, data) {
     let fName = findCol(columns, PAIR_COLS.fwdName);
     let fSeq = findCol(columns, PAIR_COLS.fwdSeq);
     let rName = findCol(columns, PAIR_COLS.revName);
     let rSeq = findCol(columns, PAIR_COLS.revSeq);
-    const out = findCol(columns, PAIR_COLS.outcome);
-
     if (fSeq === null || rSeq === null) {
-      const scores = columns.map((_, i) => dnaFraction(data, i));
-      const dnaCols = scores.map((s, i) => [s, i]).filter(x => x[0] >= 0.8).map(x => x[1]);
-      if (dnaCols.length >= 2) {
-        fSeq = fSeq === null ? dnaCols[0] : fSeq;
-        rSeq = rSeq === null ? dnaCols[1] : rSeq;
-        const nonDna = columns.map((_, i) => i).filter(i => scores[i] < 0.5 && i !== fSeq && i !== rSeq && i !== out);
-        if (fName === null && nonDna.length >= 1) fName = nonDna[0];
-        if (rName === null && nonDna.length >= 2) rName = nonDna[1];
-      }
+      const dna = dnaColumns(columns, data).filter(c => c !== fSeq && c !== rSeq);
+      if (fSeq === null && dna.length) fSeq = dna.shift();
+      if (rSeq === null && dna.length) rSeq = dna.shift();
     }
-    if (fSeq === null || rSeq === null) {
+    if (fSeq === null || rSeq === null) return null;
+    const out = outcomeColumn(columns, data, new Set([fSeq, rSeq, fName, rName].filter(c => c !== null)));
+    const taken = new Set([fSeq, rSeq, out, fName, rName].filter(c => c !== null));
+    if (fName === null) { fName = idColumnNextTo(columns, data, fSeq, taken); if (fName !== null) taken.add(fName); }
+    if (rName === null) rName = idColumnNextTo(columns, data, rSeq, taken);
+    return { fName, fSeq, rName, rSeq, out };
+  }
+
+  // Pair mode: returns { rows: [{fwd_name, fwd, rev_name, rev, outcome}], errors, hasOutcome }
+  function parsePairs(rawRows) {
+    const { columns, data } = splitHeader(rawRows);
+    const errors = [];
+    const cols = pairColumns(columns, data);
+    if (!cols) {
       errors.push('could not find two primer sequence columns (left and right)');
       return { rows: [], errors, hasOutcome: false };
     }
-
+    const { fName, fSeq, rName, rSeq, out } = cols;
     const rows = [];
     data.forEach((r, i) => {
+      if (isMissing(r[fSeq]) && isMissing(r[rSeq])) return;
       const fwd = cellStr(r[fSeq]), rev = cellStr(r[rSeq]);
-      if (!fwd && !rev) return;
-      const line = i + 1;
       if (!ACGT.test(cleanSeq(fwd).toUpperCase()) || !ACGT.test(cleanSeq(rev).toUpperCase())) {
-        errors.push(`row ${line}: sequences may only contain A, C, G and T`);
+        errors.push(`row ${i + 1}: sequences may only contain A, C, G and T`);
         return;
       }
       rows.push({
-        fwd_name: fName !== null ? cellStr(r[fName]) : `FWD_${i + 1}`,
-        rev_name: rName !== null ? cellStr(r[rName]) : `REV_${i + 1}`,
+        fwd_name: (fName !== null ? cellId(r[fName]) : null) || `FWD_${i + 1}`,
+        rev_name: (rName !== null ? cellId(r[rName]) : null) || `REV_${i + 1}`,
         fwd: cleanSeq(fwd),
         rev: cleanSeq(rev),
         outcome: out !== null && !isMissing(r[out]) ? cellStr(r[out]) : null,
@@ -402,50 +444,40 @@
     return { rows, errors, hasOutcome: out !== null };
   }
 
-  // Multiplex mode: returns { primers: [[id, seq]], errors }
+  // Multiplex mode: returns { primers: [[id, seq]], errors, notes }
   function parsePrimerList(rawRows) {
     const { columns, data } = splitHeader(rawRows);
     const errors = [];
     const nDigits = String(data.length).length;
     const autoId = n => 'P' + String(n).padStart(nDigits, '0');
 
-    // A table of primer pairs (two sequence columns): use all unique primers.
-    const fSeqByName = findCol(columns, PAIR_COLS.fwdSeq), rSeqByName = findCol(columns, PAIR_COLS.revSeq);
-    const scores = columns.map((_, i) => dnaFraction(data, i));
-    const dnaCols = scores.map((s, i) => [s, i]).filter(x => x[0] >= 0.8).map(x => x[1]);
-    let seqCol = findCol(columns, ['primer_seq', 'primer_sequence', 'sequence', 'seq']);
-    if (seqCol === null && ((fSeqByName !== null && rSeqByName !== null) || dnaCols.length >= 2)) {
-      const pairs = parsePairs(rawRows);
-      const found = [];
-      pairs.rows.forEach(p => { found.push([p.fwd_name, p.fwd.toUpperCase()], [p.rev_name, p.rev.toUpperCase()]); });
-      const { primers, notes } = uniquePrimers(found);
-      notes.unshift(`primer pair table: primers from both sequence columns are used (${found.length} primers)`);
-      return { primers, errors: pairs.errors, notes };
-    }
-
+    let seqCol = findCol(columns, LIST_COLS.seq);
     if (seqCol === null) {
-      let best = 0;
-      scores.forEach((s, i) => { if (s > scores[best]) best = i; });
-      if (!scores.length || scores[best] < 0.8) {
+      const dna = dnaColumns(columns, data);
+      // A table of primer pairs (two sequence columns): use all primers of both.
+      if (dna.length >= 2 || (findCol(columns, PAIR_COLS.fwdSeq) !== null && findCol(columns, PAIR_COLS.revSeq) !== null)) {
+        const pairs = parsePairs(rawRows);
+        const found = [];
+        pairs.rows.forEach(p => { found.push([p.fwd_name, p.fwd.toUpperCase()], [p.rev_name, p.rev.toUpperCase()]); });
+        const { primers, notes } = uniquePrimers(found);
+        notes.unshift(`primer pair table: primers from both sequence columns are used (${found.length} primers)`);
+        return { primers, errors: pairs.errors, notes };
+      }
+      if (!dna.length) {
         errors.push('could not identify a primer sequence column; add a header named primer_seq');
         return { primers: [], errors, notes: [] };
       }
-      seqCol = best;
+      seqCol = dna[0];
     }
-    let idCol = findCol(columns, ['primer_name', 'primer_id', 'name', 'id', 'ID']);
-    if (idCol === null) {
-      const nonDna = columns.map((_, i) => i).filter(i => i !== seqCol && dnaFraction(data, i) < 0.5);
-      idCol = nonDna.length ? nonDna[0] : null;
-    }
+    let idCol = findCol(columns, LIST_COLS.id);
+    if (idCol === null) idCol = idColumnNextTo(columns, data, seqCol, new Set([seqCol]));
 
     const primers = [];
     data.forEach((r, i) => {
+      if (isMissing(r[seqCol])) return;
       const seq = cleanSeq(r[seqCol]).toUpperCase();
-      if (!seq || seq === 'NAN' || seq === 'NONE') return;
       if (!ACGT.test(seq)) { errors.push(`row ${i + 1}: sequences may only contain A, C, G and T`); return; }
-      let pid = idCol !== null ? cellStr(r[idCol]) : '';
-      if (/^-?\d+\.0+$/.test(pid)) pid = String(parseInt(pid, 10));
-      if (!pid || ['nan', 'none'].includes(pid.toLowerCase())) pid = autoId(primers.length + 1);
+      const pid = (idCol !== null ? cellId(r[idCol]) : null) || autoId(primers.length + 1);
       primers.push([pid, seq]);
     });
     return { ...uniquePrimers(primers), errors };

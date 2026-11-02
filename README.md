@@ -12,6 +12,10 @@ The thermodynamics are not reimplemented. The C source of primer3's `thal` algor
 - `web/dd-core.js` ports the input parsing, scoring metrics and output formats of `python/make_primer_alignments.py`.
 - `web/app.js` is the interface. Sequences never leave the browser.
 
+## Input
+
+Excel (.xlsx), .csv, .tsv or pasted text. Column names and a header row are optional: sequence columns are recognized by their content, each ID as the column next to its sequence, and an outcome column as a column holding only `dimer` and `clean`; other columns are ignored. Recognized column names (for example `forward_primer`, `left_primer_name`, `primer_seq`, `outcome`) take precedence. The optional outcome column holds the known result of each pair; it is not used in the calculation, but the alignment report compares it with the prediction and the results table repeats it.
+
 ## Usage statistics
 
 The web app counts anonymous usage with [GoatCounter](https://www.goatcounter.com) (site code `dimerdetective`): page views, runs per mode and interaction type, the number of pairs or primers per run, and downloads. GoatCounter uses no cookies and stores no personal data. Sequences, primer names and file names are never sent. Nothing is counted when the page is opened from `localhost` or as a local file.

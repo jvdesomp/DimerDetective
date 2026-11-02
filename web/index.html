@@ -88,7 +88,7 @@
         <button class="tab active" id="tab-pairs" data-mode="pairs">pair mode</button>
         <button class="tab" id="tab-multiplex" data-mode="multiplex">multiplex mode</button>
       </div>
-      <p class="hint" id="hint-pairs">one primer pair per line: <code>left ID</code> <code>left sequence</code> <code>right ID</code> <code>right sequence</code>, separated by tabs, commas or semicolons. IDs are optional; a header row and an <code>outcome</code> column (dimer or clean) are recognized. Up to <span class="max-pairs"></span> pairs.</p>
+      <p class="hint" id="hint-pairs">one primer pair per line: <code>left ID</code> <code>left sequence</code> <code>right ID</code> <code>right sequence</code>, separated by tabs, commas or semicolons. IDs, a header row and column names are optional; extra columns are ignored, and an <code>outcome</code> column (dimer or clean) is recognized. Up to <span class="max-pairs"></span> pairs.</p>
       <p class="hint hidden" id="hint-multiplex">one primer per line: <code>ID</code> <code>sequence</code>, or the sequence only. Every primer is tested against every other primer, up to <span class="max-primers"></span> primers. A table of primer pairs (four columns) is also accepted: all unique primers are then used.</p>
       <textarea id="input-text" spellcheck="false" aria-label="primer input"></textarea>
       <div class="input-actions">
@@ -281,11 +281,17 @@
   <section class="card">
     <div class="card-header">input and output</div>
     <div class="card-body info-section">
+      <p>Column names and a header row are optional. Sequence columns are recognized by their content, each ID as the
+      column next to its sequence, and an outcome column as a column holding only <code>dimer</code> and <code>clean</code>.
+      Other columns (for example notes) are ignored. Recognized column names, listed below, take precedence.</p>
       <h3>pair mode</h3>
       <ul>
         <li>four columns: <code>left ID</code> <code>left sequence</code> <code>right ID</code> <code>right sequence</code>; IDs are optional</li>
         <li>recognized column names (case-insensitive) include <code>forward_primer_name</code>, <code>left_primer_name</code>, <code>forward_primer</code>, <code>left_primer</code>, the <code>reverse_</code> and <code>right_</code> equivalents, and <code>outcome</code> (or <code>label</code>, <code>class</code>, <code>result</code>, <code>status</code>)</li>
         <li>missing IDs are generated as FWD_1, FWD_2, &hellip; and REV_1, REV_2, &hellip;</li>
+        <li>an optional outcome column holds the known result of each pair (<code>dimer</code> or <code>clean</code>, for example from
+        no-template controls). It is not used in the calculation: the alignment report compares it with the prediction
+        (&#10003; or &#10007; label mismatch), and the results table repeats it next to the prediction.</li>
       </ul>
       <h3>multiplex mode</h3>
       <ul>

@@ -19,7 +19,7 @@ The output is a results table (.xlsx, .tsv or .csv) and an alignment report (.tx
 
 The ΔG thresholds were calibrated on 200 RT-qPCR assays: 100 that form primer dimers and 100 clean assays (data courtesy of Biogazelle). The reactions used 250 nM of each primer, SsoAdvanced Universal SYBR Green Supermix, 45 cycles and 60 °C annealing. A positive signal in the no-template control (NTC) defined a primer dimer.
 
-`min_end_hetero` separates the two groups with an area under the ROC curve (AUC) of 0.939.
+`min_end_hetero` separates the two groups with an area under the ROC curve (AUC) of 0.939. The primers were 16 to 28 nt long (median 20 nt); the thresholds have not been tested on longer primers, such as primers with adapter tails.
 
 | `min_end_hetero` threshold | criterion | sensitivity | specificity |
 |---|---|---|---|
@@ -45,6 +45,8 @@ Interpret homodimer values with caution.
 ## Input
 
 Excel (.xlsx), .csv, .tsv or pasted text. Column names and a header row are optional: sequence columns are recognized by their content, each ID as the column next to its sequence, and an outcome column as a column holding only `dimer` and `clean`; other columns are ignored. Recognized column names (for example `forward_primer`, `left_primer_name`, `primer_seq`, `outcome`) take precedence. The optional outcome column holds the known result of each pair; it is not used in the calculation, but the alignment report compares it with the prediction and the results table repeats it.
+
+Primer length: primer3 needs at least one of the two sequences to be 60 nt or shorter. A pair of two primers longer than 60 nt, and the self-dimer of a primer longer than 60 nt, are not computed: their ΔG values stay empty, `flagged` and `predicted` read `not computed`, the alignment report gives the reason, and sorting puts them last.
 
 ## How it works
 
@@ -93,7 +95,7 @@ Every output file of the web app and the script states the version and build, fo
 
 The results reported here were obtained with:
 
-- DimerDetective 1.2 (build 20261102-0951): web app and Python script
+- DimerDetective 1.2 (build 20261102-1406): web app and Python script
 - primer3-py 2.4.0, which includes libprimer3 release 2.6.1: `calc_end_stability` and `thal.c` (the latter compiled unchanged for the web app)
 - Emscripten 6.0.13: compilation of `thal.c` to WebAssembly
 - Python 3.13.5 with pandas 3.1.0 and openpyxl 3.1.5: Python script (the automated checks also use Python 3.12)

@@ -48,6 +48,8 @@ jobs:
           python tests/validate.py --mode multiplex tests/example_primers.csv
           python tests/validate.py --mode multiplex tests/example_pairs.csv
           python tests/validate.py --mode multiplex tests/example_primers_duplicates.csv
+          python tests/validate.py --mode pairs --type both tests/example_long_primers.csv
+          python tests/validate.py --mode multiplex --type both tests/example_long_primers.csv
           for f in tests/layouts/pairs_*.csv; do python tests/validate.py --mode pairs --type both "$f"; done
           for f in tests/layouts/*.csv; do python tests/validate.py --mode multiplex --type both "$f"; done
 

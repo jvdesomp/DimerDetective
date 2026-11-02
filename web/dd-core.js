@@ -19,7 +19,7 @@
   // Belgian time, YYYYMMDD-hhmm). Must equal VERSION and BUILD in
   // python/make_primer_alignments.py; both go into every output file.
   const VERSION = '1.2';
-  const BUILD = '20261102-0951';
+  const BUILD = '20261102-1406';
   const VERSION_LABEL = `${VERSION} (build ${BUILD})`;
 
   // Reaction conditions used for calibration (same as PRIMER3_PARAMS).
@@ -28,6 +28,11 @@
   // Calibrated thresholds (kcal/mol) and risk tiers, materials and methods v1.2.
   const THRESHOLDS = { spec100: -2.44, sens95: -1.00, sens100: -0.27 };
   const DEFAULT_THRESHOLD = THRESHOLDS.sens95;
+
+  // primer3's thal() needs at least one of the two sequences to be at most
+  // 60 nt (THAL_MAX_ALIGN). Longer combinations are reported as not computed.
+  const MAX_LEN = 60;
+  const NOT_COMPUTED = `primer3 needs at least one sequence of ${MAX_LEN} nt or shorter`;
 
   // ── WebAssembly engine ──────────────────────────────────────────────────
 
@@ -47,15 +52,20 @@
 
   // 3' end stability of seq1 against seq2: { dg (kcal/mol), structure }.
   // Same call as primer3.calc_end_stability(seq1, seq2, **PRIMER3_PARAMS).
+  // dg is null when both sequences are longer than MAX_LEN.
   function endStability(seq1, seq2) {
     const key = seq1 + '|' + seq2;
     let r = cache.get(key);
     if (r) return r;
-    const p = PARAMS;
-    const dg = endFn(seq1, seq2, p.mv_conc, p.dv_conc, p.dntp_conc, p.dna_conc, p.temp_c, p.max_loop);
-    r = msgFn()
-      ? { dg: 0.0, structure: '' }          // primer3 error: script falls back to 0.0
-      : { dg: dg / 1000, structure: structFn() };
+    if (seq1.length > MAX_LEN && seq2.length > MAX_LEN) {
+      r = { dg: null, structure: '' };
+    } else {
+      const p = PARAMS;
+      const dg = endFn(seq1, seq2, p.mv_conc, p.dv_conc, p.dntp_conc, p.dna_conc, p.temp_c, p.max_loop);
+      r = msgFn()
+        ? { dg: 0.0, structure: '' }          // primer3 error: script falls back to 0.0
+        : { dg: dg / 1000, structure: structFn() };
+    }
     cache.set(key, r);
     return r;
   }
@@ -136,21 +146,40 @@
     const ll = endStability(seqA, seqA);
     const rr = endStability(seqB, seqB);
 
-    const which = lr.dg <= rl.dg ? 'A' : 'B';
+    const minHet = minOrNull(lr.dg, rl.dg);
+    const which = minHet === null || lr.dg <= rl.dg ? 'A' : 'B';
     const dom = which === 'A' ? lr : rl;
     const alt = which === 'A' ? rl : lr;
 
     return {
       'end_left-right_dg': lr.dg,
       'end_right-left_dg': rl.dg,
-      'min_end_hetero': Math.min(lr.dg, rl.dg),
+      'min_end_hetero': minHet,
       'end_left-left_dg': ll.dg,
       'end_right-right_dg': rr.dg,
-      'min_end_homo': Math.min(ll.dg, rr.dg),
+      'min_end_homo': minOrNull(ll.dg, rr.dg),
       which: which,
-      aln: parseStructure(dom.structure),
-      aln_alt: seqA === seqB ? null : parseStructure(alt.structure),
+      aln: minHet === null ? null : parseStructure(dom.structure),
+      aln_alt: minHet === null || seqA === seqB ? null : parseStructure(alt.structure),
     };
+  }
+
+  function minOrNull(a, b) {
+    return a === null || b === null ? null : Math.min(a, b);
+  }
+
+  function isFlagged(dg, threshold) {
+    return dg !== null && dg < threshold;
+  }
+
+  function call(dg, threshold) {
+    if (dg === null) return 'not computed';
+    return dg < threshold ? 'dimer' : 'clean';
+  }
+
+  function notComputedReason(seqA, seqB) {
+    const who = seqA.toUpperCase() === seqB.toUpperCase() ? 'the primer is' : 'both primers are';
+    return `${who} longer than ${MAX_LEN} nt; ${NOT_COMPUTED}`;
   }
 
   // ── Number formatting identical to Python ───────────────────────────────
@@ -193,13 +222,22 @@
   function formatPair(row, result, threshold) {
     const f = row.fwd_name, r = row.rev_name;
     const lines = [SEP, `${f} / ${r}  [heterodimer]`, ''];
-    const call = result.min_end_hetero < threshold ? 'dimer' : 'clean';
+    const c = call(result.min_end_hetero, threshold);
     if (row.outcome !== undefined && row.outcome !== null && row.outcome !== '') {
       const label = String(row.outcome).toLowerCase();
-      const correct = call === label ? '✓' : '✗ (label mismatch)';
-      lines.push(`  predicted: ${call}   label: ${label}   ${correct}`);
+      if (result.min_end_hetero === null) {
+        lines.push(`  predicted: ${c}   label: ${label}`);
+      } else {
+        const correct = c === label ? '✓' : '✗ (label mismatch)';
+        lines.push(`  predicted: ${c}   label: ${label}   ${correct}`);
+      }
     } else {
-      lines.push(`  predicted: ${call}`);
+      lines.push(`  predicted: ${c}`);
+    }
+    if (result.min_end_hetero === null) {
+      lines.push(`  not computed: ${notComputedReason(row.fwd, row.rev)}`, '');
+      lines.push(`  ${f}: 5'-${row.fwd}-3'`, `  ${r}: 5'-${row.rev}-3'`, '');
+      return lines;
     }
     const d = directionIds(result, f, r);
     lines.push(`  end_left-right_dg = ${fmt(result['end_left-right_dg'], 3, 7)} kcal/mol  (3' of ${f} vs ${r})`);
@@ -217,6 +255,13 @@
   }
 
   function formatHomodimerEntry(pid, seq, result) {
+    if (result.min_end_hetero === null) {
+      return [
+        SEP, `${pid} / ${pid}  [homodimer]`, '',
+        `  not computed: ${notComputedReason(seq, seq)}`, '',
+        `  ${pid}: 5'-${seq}-3'`, '',
+      ];
+    }
     return [
       SEP, `${pid} / ${pid}  [homodimer]`, '',
       `  min_end_homo = ${fmt(result.min_end_hetero, 3, 7)} kcal/mol`, '',
@@ -227,18 +272,24 @@
 
   function formatMultiplexEntry(e, threshold) {
     const { type, idA, seqA, idB, seqB, result } = e;
-    const call = result.min_end_hetero < threshold ? 'dimer' : 'clean';
+    const c = call(result.min_end_hetero, threshold);
     const lines = [SEP];
-    if (type === 'homodimer') {
+    if (result.min_end_hetero === null) {
+      lines.push(`${idA} / ${idB}  [${type === 'homodimer' ? 'homodimer' : 'heterodimer'}]`, '');
+      lines.push(`  predicted: ${c}`);
+      lines.push(`  not computed: ${notComputedReason(seqA, seqB)}`, '');
+      lines.push(`  ${idA}: 5'-${seqA}-3'`);
+      if (type !== 'homodimer') lines.push(`  ${idB}: 5'-${seqB}-3'`);
+    } else if (type === 'homodimer') {
       lines.push(`${idA} / ${idA}  [homodimer]`, '');
-      lines.push(`  predicted: ${call}`);
+      lines.push(`  predicted: ${c}`);
       lines.push(`  end_self_dg = ${fmt(result['end_left-left_dg'], 3, 7)} kcal/mol`, '');
       lines.push(`  ${idA}: 5'-${seqA}-3'`, '');
       lines.push(...alnBlock(result.aln, idA, idA));
     } else {
       const d = directionIds(result, idA, idB);
       lines.push(`${idA} / ${idB}  [heterodimer]`, '');
-      lines.push(`  predicted: ${call}`);
+      lines.push(`  predicted: ${c}`);
       lines.push(`  end_left-right_dg = ${fmt(result['end_left-right_dg'], 3, 7)} kcal/mol  (3' of ${idA} vs ${idB})`);
       lines.push(`  end_right-left_dg = ${fmt(result['end_right-left_dg'], 3, 7)} kcal/mol  (3' of ${idB} vs ${idA})`);
       lines.push(`  min_end_hetero    = ${fmt(result.min_end_hetero, 3, 7)} kcal/mol  ← dominant (${d.dominant} 3'-end)`);
@@ -546,24 +597,36 @@
     return { type, n, idA, seqA, idB, seqB, result: computePair(seqA, seqB) };
   }
 
+  // Not computed entries go last in both directions.
   function sortEntries(entries, sort) {
     const e = entries.slice();
-    if (sort === 'asc') e.sort((a, b) => a.result.min_end_hetero - b.result.min_end_hetero);
-    else if (sort === 'desc') e.sort((a, b) => b.result.min_end_hetero - a.result.min_end_hetero);
+    const by = sign => (a, b) => {
+      const x = a.result.min_end_hetero, y = b.result.min_end_hetero;
+      if (x === null || y === null) return (x === null) - (y === null);
+      return sign * (x - y);
+    };
+    if (sort === 'asc') e.sort(by(1));
+    else if (sort === 'desc') e.sort(by(-1));
     return e;
   }
+
+  function countNotComputed(results) {
+    return results.filter(r => r.min_end_hetero === null).length;
+  }
+
+  const notComputedCount = n => (n ? `   |   not computed: ${n}` : '');
 
   // ── Reports (exact script output) ───────────────────────────────────────
 
   function pairsReport(rows, pairResults, threshold, type) {
-    const flagged = pairResults.filter(r => r.min_end_hetero < threshold).length;
+    const flagged = pairResults.filter(r => isFlagged(r.min_end_hetero, threshold)).length;
     const lines = [
       '='.repeat(72), 'DimerDetective alignment output', '',
       `version   : ${VERSION_LABEL}`,
       'mode      : pairs',
       `type      : ${type}`,
       `threshold : ${fmt(threshold, 2)} kcal/mol → dimer`,
-      `pairs     : ${rows.length}   |   flagged: ${flagged}`,
+      `pairs     : ${rows.length}   |   flagged: ${flagged}${notComputedCount(countNotComputed(pairResults))}`,
       '| = Watson-Crick pair', '. = bulge on opposite strand',
       '='.repeat(72), '',
     ];
@@ -587,14 +650,13 @@
   function pairsTable(rows, pairResults, threshold, hasOutcome) {
     return rows.map((row, i) => {
       const r = pairResults[i];
-      const flagged = r.min_end_hetero < threshold;
       const t = {
         fwd_name: row.fwd_name, fwd_seq: row.fwd, rev_name: row.rev_name, rev_seq: row.rev,
         'end_left-right_dg': r['end_left-right_dg'], 'end_right-left_dg': r['end_right-left_dg'],
         min_end_hetero: r.min_end_hetero,
         'end_left-left_dg': r['end_left-left_dg'], 'end_right-right_dg': r['end_right-right_dg'],
         min_end_homo: r.min_end_homo,
-        flagged: flagged ? 'YES' : 'NO', predicted: flagged ? 'dimer' : 'clean',
+        flagged: flaggedLabel(r.min_end_hetero, threshold), predicted: call(r.min_end_hetero, threshold),
       };
       if (hasOutcome) t.outcome = row.outcome === null ? '' : row.outcome;
       t.version = VERSION_LABEL;
@@ -603,13 +665,14 @@
   }
 
   function multiplexReport(nPrimers, sorted, threshold, type, sort, notes) {
-    const flagged = sorted.filter(e => e.result.min_end_hetero < threshold).length;
+    const flagged = sorted.filter(e => isFlagged(e.result.min_end_hetero, threshold)).length;
+    const nc = notComputedCount(countNotComputed(sorted.map(e => e.result)));
     const lines = [
       '='.repeat(72), 'DimerDetective alignment output', '',
       `version   : ${VERSION_LABEL}`,
       'mode      : multiplex',
       `threshold : ${fmt(threshold, 2)} kcal/mol → dimer`,
-      `primers   : ${nPrimers}   |   pairs: ${sorted.length}   |   flagged: ${flagged}`,
+      `primers   : ${nPrimers}   |   pairs: ${sorted.length}   |   flagged: ${flagged}${nc}`,
       ...(notes || []).map(n => `note      : ${n}`),
       `type      : ${type}`,
       `sorted by : ${SORT_LABELS[sort] || sort}`,
@@ -632,10 +695,15 @@
         'end_right-left_dg': homo ? null : r['end_right-left_dg'],
         min_end_hetero: homo ? null : r.min_end_hetero,
         end_self_dg: homo ? r['end_left-left_dg'] : null,
-        flagged: r.min_end_hetero < threshold ? 'YES' : 'NO',
+        flagged: flaggedLabel(r.min_end_hetero, threshold),
         version: VERSION_LABEL,
       };
     });
+  }
+
+  function flaggedLabel(dg, threshold) {
+    if (dg === null) return 'not computed';
+    return dg < threshold ? 'YES' : 'NO';
   }
 
   const DG_COLS = ['end_left-right_dg', 'end_right-left_dg', 'min_end_hetero', 'end_left-left_dg', 'end_right-right_dg', 'min_end_homo', 'end_self_dg'];
@@ -662,17 +730,19 @@
   }
 
   function riskTier(dg) {
+    if (dg === null) return 'none';
     if (dg < THRESHOLDS.spec100) return 'high';
     if (dg <= THRESHOLDS.sens100) return 'medium';
     return 'low';
   }
 
   return {
-    VERSION, BUILD, VERSION_LABEL, PARAMS, THRESHOLDS, DEFAULT_THRESHOLD,
+    VERSION, BUILD, VERSION_LABEL, PARAMS, THRESHOLDS, DEFAULT_THRESHOLD, MAX_LEN, NOT_COMPUTED,
     init, endStability, clearCache, parseStructure, computePair,
     textToRows, parsePairs, parsePrimerList,
     pairEntries, multiplexJobs, runJob, sortEntries,
     pairsReport, pairsTable, multiplexReport, multiplexTable,
-    tableToText, tableToAoa, riskTier, fmt, alnBlock, SORT_LABELS,
+    tableToText, tableToAoa, riskTier, isFlagged, notComputedReason, countNotComputed,
+    fmt, alnBlock, SORT_LABELS,
   };
 });

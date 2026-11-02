@@ -57,7 +57,7 @@ Table columns:
   end_right-right_dg  ΔG for 3' end of B vs itself  (kcal/mol)
   min_end_hetero      min(end_left-right_dg, end_right-left_dg)
   min_end_homo        min(end_left-left_dg, end_right-right_dg)
-  flagged             YES / NO  (min_end_hetero < threshold)
+  flagged             YES / NO  (min_end_hetero < threshold), or not computed
 
 Expected Excel/CSV input (case-insensitive column names, all optional):
   primer_name  (or primer_id / name / id)   — omit to auto-generate P001, P002, …
@@ -89,6 +89,12 @@ Alignment display:
 primer3 parameters:
   mv_conc=50 mM, dv_conc=1.5 mM, dntp_conc=0.6 mM, dna_conc=50 nM, temp_c=37 °C
 
+Primer length:
+  primer3 needs at least one of the two sequences to be 60 nt or shorter.
+  A pair of two primers longer than 60 nt, and the self-dimer of a primer
+  longer than 60 nt, are reported as not computed (empty ΔG values).
+  The thresholds were calibrated on primers of 16 to 28 nt.
+
 Requirements:
   pip install primer3-py==2.4.0 openpyxl pandas
 """
@@ -105,13 +111,18 @@ import primer3
 # change in Belgian time, YYYYMMDD-hhmm). Must equal VERSION and BUILD in
 # web/dd-core.js; both are written into every output file.
 VERSION = '1.2'
-BUILD = '20261102-0951'
+BUILD = '20261102-1406'
 VERSION_LABEL = f"{VERSION} (build {BUILD})"
 
 # ── Thermodynamic helpers ──────────────────────────────────────────────────
 
 PRIMER3_PARAMS = dict(mv_conc=50.0, dv_conc=1.5, dntp_conc=0.6,
                       dna_conc=50.0, temp_c=37.0)
+
+# primer3's thal() needs at least one of the two sequences to be at most
+# 60 nt (THAL_MAX_ALIGN). Longer combinations are reported as not computed.
+MAX_LEN = 60
+NOT_COMPUTED = f"primer3 needs at least one sequence of {MAX_LEN} nt or shorter"
 
 def safe_p3(func, *args):
     try:
@@ -120,9 +131,31 @@ def safe_p3(func, *args):
         return None
 
 def end_dg(seq1, seq2):
-    """ΔG (kcal/mol) for 3' end of seq1 annealed to seq2."""
+    """ΔG (kcal/mol) for 3' end of seq1 annealed to seq2; None when both
+    sequences are longer than MAX_LEN."""
+    if len(seq1) > MAX_LEN and len(seq2) > MAX_LEN:
+        return None
     r = safe_p3(primer3.calc_end_stability, seq1.upper(), seq2.upper())
     return r.dg / 1000 if r else 0.0
+
+
+def _min(a, b):
+    return None if a is None or b is None else min(a, b)
+
+def _r4(v):
+    return None if v is None else round(v, 4)
+
+def _flagged(dg, threshold):
+    return dg is not None and dg < threshold
+
+def _call(dg, threshold):
+    if dg is None:
+        return 'not computed'
+    return 'dimer' if dg < threshold else 'clean'
+
+def not_computed_reason(seq_a, seq_b):
+    who = 'the primer is' if seq_a.upper() == seq_b.upper() else 'both primers are'
+    return f"{who} longer than {MAX_LEN} nt; {NOT_COMPUTED}"
 
 
 # ── Direct access to primer3-py's thal() for structures ───────────────────
@@ -301,6 +334,8 @@ def compute_pair(seq_a, seq_b):
 
     Works for both heterodimers (seq_a != seq_b) and homodimers (seq_a == seq_b).
     For homodimers, end_left-right_dg == end_right-left_dg == end_left-left_dg.
+    Values are None when primer3 cannot compute them (both sequences longer
+    than MAX_LEN).
 
     Returns a dict with scores and alignment data.
     """
@@ -309,15 +344,15 @@ def compute_pair(seq_a, seq_b):
 
     het_fwd_dg = end_dg(seq_a, seq_b)   # 3' of left vs right
     het_rev_dg = end_dg(seq_b, seq_a)   # 3' of right vs left
-    min_end_hetero = min(het_fwd_dg, het_rev_dg)
+    min_end_hetero = _min(het_fwd_dg, het_rev_dg)
 
     # Self-dimer terms (kept for pair-mode backward compatibility)
     end_ll_dg   = end_dg(seq_a, seq_a)
     end_rr_dg   = end_dg(seq_b, seq_b)
-    min_end_homo = min(end_ll_dg, end_rr_dg)
+    min_end_homo = _min(end_ll_dg, end_rr_dg)
 
     # Dominant direction: lower (more negative) ΔG drives the primary alignment
-    if het_fwd_dg <= het_rev_dg:   # left-right is dominant
+    if min_end_hetero is None or het_fwd_dg <= het_rev_dg:   # left-right is dominant
         top_dom, bot_dom = seq_a, seq_b
         top_alt, bot_alt = seq_b, seq_a
         which = 'A'             # 3' end of A is dominant
@@ -326,9 +361,12 @@ def compute_pair(seq_a, seq_b):
         top_alt, bot_alt = seq_a, seq_b
         which = 'B'             # 3' end of B is dominant
 
-    aln_dom = build_alignment(top_dom, bot_dom)
-    # For homodimers the two directions are identical; skip the redundant call
-    aln_alt = None if seq_a == seq_b else build_alignment(top_alt, bot_alt)
+    if min_end_hetero is None:      # not computed: no structure to draw
+        aln_dom = aln_alt = None
+    else:
+        aln_dom = build_alignment(top_dom, bot_dom)
+        # For homodimers the two directions are identical; skip the redundant call
+        aln_alt = None if seq_a == seq_b else build_alignment(top_alt, bot_alt)
 
     return {
         'end_left-right_dg': het_fwd_dg,
@@ -376,13 +414,24 @@ def format_pair(row, result, threshold, show_homodimers=False):
     lines.append(f"{fwd_name} / {rev_name}  [heterodimer]")
     lines.append('')
 
-    call = 'dimer' if result['min_end_hetero'] < threshold else 'clean'
+    call = _call(result['min_end_hetero'], threshold)
     if 'outcome' in row and pd.notna(row['outcome']):
         label   = row['outcome'].lower()
-        correct = '✓' if call == label else '✗ (label mismatch)'
-        lines.append(f"  predicted: {call}   label: {label}   {correct}")
+        if result['min_end_hetero'] is None:
+            lines.append(f"  predicted: {call}   label: {label}")
+        else:
+            correct = '✓' if call == label else '✗ (label mismatch)'
+            lines.append(f"  predicted: {call}   label: {label}   {correct}")
     else:
         lines.append(f"  predicted: {call}")
+
+    if result['min_end_hetero'] is None:
+        lines.append(f"  not computed: {not_computed_reason(row['fwd'], row['rev'])}")
+        lines.append('')
+        lines.append(f"  {fwd_name}: 5'-{row['fwd']}-3'")
+        lines.append(f"  {rev_name}: 5'-{row['rev']}-3'")
+        lines.append('')
+        return lines
 
     dominant_id  = fwd_name if result['which'] == 'A' else rev_name
     lines.append(f"  end_left-right_dg = {result['end_left-right_dg']:7.3f} kcal/mol  (3' of {fwd_name} vs {rev_name})")
@@ -419,12 +468,16 @@ def format_homodimer_entry(pid, seq, result):
     lines = [_SEP]
     lines.append(f"{pid} / {pid}  [homodimer]")
     lines.append('')
-    lines.append(f"  min_end_homo = {result['min_end_hetero']:7.3f} kcal/mol")
+    if result['min_end_hetero'] is None:
+        lines.append(f"  not computed: {not_computed_reason(seq, seq)}")
+    else:
+        lines.append(f"  min_end_homo = {result['min_end_hetero']:7.3f} kcal/mol")
     lines.append('')
     lines.append(f"  {pid}: 5'-{seq}-3'")
     lines.append('')
-    lines.extend(_aln_block(result['aln'], pid, pid))
-    lines.append('')
+    if result['min_end_hetero'] is not None:
+        lines.extend(_aln_block(result['aln'], pid, pid))
+        lines.append('')
     return lines
 
 
@@ -434,11 +487,22 @@ def format_multiplex_entry(pair_type, id_a, seq_a, id_b, seq_b,
                            result, threshold):
     """Format one entry for multiplex alignment .txt output."""
     lines = [_SEP]
+    call = _call(result['min_end_hetero'], threshold)
 
-    if pair_type == 'homodimer':
+    if result['min_end_hetero'] is None:
+        kind = 'homodimer' if pair_type == 'homodimer' else 'heterodimer'
+        lines.append(f"{id_a} / {id_b}  [{kind}]")
+        lines.append('')
+        lines.append(f"  predicted: {call}")
+        lines.append(f"  not computed: {not_computed_reason(seq_a, seq_b)}")
+        lines.append('')
+        lines.append(f"  {id_a}: 5'-{seq_a}-3'")
+        if pair_type != 'homodimer':
+            lines.append(f"  {id_b}: 5'-{seq_b}-3'")
+    elif pair_type == 'homodimer':
         lines.append(f"{id_a} / {id_a}  [homodimer]")
         lines.append('')
-        lines.append(f"  predicted: {'dimer' if result['min_end_hetero'] < threshold else 'clean'}")
+        lines.append(f"  predicted: {call}")
         lines.append(f"  end_self_dg = {result['end_left-left_dg']:7.3f} kcal/mol")
         lines.append('')
         lines.append(f"  {id_a}: 5'-{seq_a}-3'")
@@ -448,7 +512,7 @@ def format_multiplex_entry(pair_type, id_a, seq_a, id_b, seq_b,
         dominant_id  = id_a if result['which'] == 'A' else id_b
         lines.append(f"{id_a} / {id_b}  [heterodimer]")
         lines.append('')
-        lines.append(f"  predicted: {'dimer' if result['min_end_hetero'] < threshold else 'clean'}")
+        lines.append(f"  predicted: {call}")
         lines.append(f"  end_left-right_dg = {result['end_left-right_dg']:7.3f} kcal/mol  (3' of {id_a} vs {id_b})")
         lines.append(f"  end_right-left_dg = {result['end_right-left_dg']:7.3f} kcal/mol  (3' of {id_b} vs {id_a})")
         lines.append(f"  min_end_hetero    = {result['min_end_hetero']:7.3f} kcal/mol  ← dominant ({dominant_id} 3'-end)")
@@ -705,6 +769,7 @@ def run_pairs(args):
     # ── Compute all pairs ──────────────────────────────────────────────────
     n_pairs       = len(rows)
     n_flagged_het = 0
+    n_not_computed = 0
     pair_rows     = []
     tsv_rows      = []
 
@@ -712,9 +777,11 @@ def run_pairs(args):
         fwd, rev = row['fwd'], row['rev']
         fwd_name, rev_name, outcome = row['fwd_name'], row['rev_name'], row['outcome']
         result  = compute_pair(fwd, rev)
-        flagged = result['min_end_hetero'] < args.threshold
+        flagged = _flagged(result['min_end_hetero'], args.threshold)
         if flagged:
             n_flagged_het += 1
+        if result['min_end_hetero'] is None:
+            n_not_computed += 1
         pair_rows.append((row, result))
 
         tsv_row = {
@@ -722,19 +789,23 @@ def run_pairs(args):
             'fwd_seq':            fwd,
             'rev_name':           rev_name,
             'rev_seq':            rev,
-            'end_left-right_dg':  round(result['end_left-right_dg'],  4),
-            'end_right-left_dg':  round(result['end_right-left_dg'],  4),
-            'min_end_hetero':     round(result['min_end_hetero'],      4),
-            'end_left-left_dg':   round(result['end_left-left_dg'],   4),
-            'end_right-right_dg': round(result['end_right-right_dg'], 4),
-            'min_end_homo':       round(result['min_end_homo'],        4),
-            'flagged':            'YES' if flagged else 'NO',
-            'predicted':          'dimer' if flagged else 'clean',
+            'end_left-right_dg':  _r4(result['end_left-right_dg']),
+            'end_right-left_dg':  _r4(result['end_right-left_dg']),
+            'min_end_hetero':     _r4(result['min_end_hetero']),
+            'end_left-left_dg':   _r4(result['end_left-left_dg']),
+            'end_right-right_dg': _r4(result['end_right-right_dg']),
+            'min_end_homo':       _r4(result['min_end_homo']),
+            'flagged':            ('not computed' if result['min_end_hetero'] is None
+                                   else 'YES' if flagged else 'NO'),
+            'predicted':          _call(result['min_end_hetero'], args.threshold),
         }
         if has_outcome:
             tsv_row['outcome'] = outcome
         tsv_row['version'] = VERSION_LABEL
         tsv_rows.append(tsv_row)
+
+    if n_not_computed:
+        print(f"Note: {n_not_computed} of {n_pairs} pairs not computed: {NOT_COMPUTED}")
 
     # ── Write results table ────────────────────────────────────────────────
     out_df = pd.DataFrame(tsv_rows)
@@ -755,7 +826,8 @@ def run_pairs(args):
         f"mode      : pairs",
         f"type      : {pair_type}",
         f"threshold : {args.threshold:.2f} kcal/mol → dimer",
-        f"pairs     : {n_pairs}   |   flagged: {n_flagged_het}",
+        f"pairs     : {n_pairs}   |   flagged: {n_flagged_het}"
+        + (f"   |   not computed: {n_not_computed}" if n_not_computed else ''),
         "| = Watson-Crick pair",
         ". = bulge on opposite strand",
         '=' * 72,
@@ -834,18 +906,24 @@ def run_multiplex(args):
             result = compute_pair(seq, seq)
             entries.append(('homodimer', pid, seq, pid, seq, result))
 
-    # ── Sort ──────────────────────────────────────────────────────────────
+    # ── Sort (not computed entries last) ──────────────────────────────────
     sort = getattr(args, 'sort', 'asc')
+    def dg_key(e, sign):
+        v = e[5]['min_end_hetero']
+        return (v is None, 0.0 if v is None else sign * v)
     if sort == 'asc':
-        entries.sort(key=lambda e: e[5]['min_end_hetero'])
+        entries.sort(key=lambda e: dg_key(e, 1))
     elif sort == 'desc':
-        entries.sort(key=lambda e: e[5]['min_end_hetero'], reverse=True)
+        entries.sort(key=lambda e: dg_key(e, -1))
     # 'input': preserve natural order (heterodimers first, then homodimers)
 
     # ── Write results table (.tsv or .xlsx) ───────────────────────────────
     tsv_rows = []
     for pair_type, id_a, seq_a, id_b, seq_b, result in entries:
-        flagged = 'YES' if result['min_end_hetero'] < args.threshold else 'NO'
+        if result['min_end_hetero'] is None:
+            flagged = 'not computed'
+        else:
+            flagged = 'YES' if result['min_end_hetero'] < args.threshold else 'NO'
         homo = pair_type == 'homodimer'
         tsv_rows.append({
             'type':               pair_type,
@@ -855,15 +933,18 @@ def run_multiplex(args):
             'seq_B':              seq_b,
             # heterodimer rows: the three heterodimer values; homodimer rows:
             # one self-dimer value (end_self_dg), the others left empty
-            'end_left-right_dg':  None if homo else round(result['end_left-right_dg'], 4),
-            'end_right-left_dg':  None if homo else round(result['end_right-left_dg'], 4),
-            'min_end_hetero':     None if homo else round(result['min_end_hetero'],    4),
-            'end_self_dg':        round(result['end_left-left_dg'], 4) if homo else None,
+            'end_left-right_dg':  None if homo else _r4(result['end_left-right_dg']),
+            'end_right-left_dg':  None if homo else _r4(result['end_right-left_dg']),
+            'min_end_hetero':     None if homo else _r4(result['min_end_hetero']),
+            'end_self_dg':        _r4(result['end_left-left_dg']) if homo else None,
             'flagged':            flagged,
             'version':            VERSION_LABEL,
         })
 
     n_flagged = sum(1 for r in tsv_rows if r['flagged'] == 'YES')
+    n_not_computed = sum(1 for r in tsv_rows if r['flagged'] == 'not computed')
+    if n_not_computed:
+        print(f"Note: {n_not_computed} of {len(tsv_rows)} combinations not computed: {NOT_COMPUTED}")
     out_df    = pd.DataFrame(tsv_rows)
 
     if args.output.lower().endswith('.xlsx'):
@@ -881,7 +962,8 @@ def run_multiplex(args):
         f"version   : {VERSION_LABEL}",
         f"mode      : multiplex",
         f"threshold : {args.threshold:.2f} kcal/mol → dimer",
-        f"primers   : {n}   |   pairs: {len(entries)}   |   flagged: {n_flagged}",
+        f"primers   : {n}   |   pairs: {len(entries)}   |   flagged: {n_flagged}"
+        + (f"   |   not computed: {n_not_computed}" if n_not_computed else ''),
         *[f"note      : {note}" for note in notes],
         f"type      : {getattr(args, 'type', 'both')}",
         f"sorted by : {_sort_label(sort)}",

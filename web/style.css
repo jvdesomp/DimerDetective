@@ -57,6 +57,7 @@ td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .badge-high{background:#fde8e8;color:#c0392b}
 .badge-medium{background:#fef3e8;color:#d35400}
 .badge-low{background:#e8f5ee;color:#27ae60}
+.badge-none{background:#eef0f2;color:#59636e}
 .progress-wrap{background:#e8ecf3;border-radius:4px;height:8px;margin:8px 0;overflow:hidden}
 .progress-bar{height:100%;background:#1a6fc4;width:0}
 .status{font-size:.82em;color:#555;margin:4px 0}

@@ -36,6 +36,14 @@ const ALIGNMENT = [
   const alnOk = lines.join('\n') === ALIGNMENT.join('\n');
   if (!alnOk) failed++;
   console.log(`${alnOk ? 'ok  ' : 'FAIL'} alignment\n${lines.join('\n')}`);
+  // primer3 needs one sequence of at most 60 nt; longer pairs are not computed
+  const [a, b] = CASES[0];
+  const long = DD.computePair('T'.repeat(38) + a, 'A'.repeat(41) + b);
+  const edge = DD.computePair('T'.repeat(38) + a, 'A'.repeat(40) + b);
+  const lenOk = long.min_end_hetero === null && long.aln === null &&
+    Math.abs(edge.min_end_hetero * 1000 - CASES[0][2]) < 1e-3 && edge['end_left-left_dg'] === null;
+  if (!lenOk) failed++;
+  console.log(`${lenOk ? 'ok  ' : 'FAIL'} length limit: 61 + 61 nt not computed, 61 + 60 nt computed`);
   // the script and the web app must carry the same version and build
   const py = require('fs').readFileSync(require('path').join(__dirname, '..', 'python', 'make_primer_alignments.py'), 'utf8');
   const pyVersion = (py.match(/^VERSION = '([^']+)'/m) || [])[1];

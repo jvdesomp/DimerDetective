@@ -53,11 +53,11 @@ function getThreshold() {
   return Number.isFinite(v) ? v : DD.DEFAULT_THRESHOLD;
 }
 
-const fmt2 = x => DD.fmt(x, 2);
+const fmt2 = x => (x === null ? '' : DD.fmt(x, 2));
 
 function riskBadge(dg) {
   const tier = DD.riskTier(dg);
-  return `<span class="badge badge-${tier}">${tier} risk</span>`;
+  return `<span class="badge badge-${tier}">${tier === 'none' ? 'not computed' : tier + ' risk'}</span>`;
 }
 
 function setMessages(lines) {
@@ -206,6 +206,8 @@ async function run() {
       const pairResults = new Array(parsed.rows.length);
       await runChunked(parsed.rows.length, i => { pairResults[i] = DD.computePair(parsed.rows[i].fwd, parsed.rows[i].rev); }, 'primer pairs');
       const { entries } = DD.pairEntries(parsed.rows, type);   // reuses cached results
+      const nc = DD.countNotComputed(pairResults);
+      if (nc) messages.push(`${nc} of ${pairResults.length} pairs not computed: ${DD.NOT_COMPUTED}`);
       state.run = { mode: 'pairs', type, rows: parsed.rows, hasOutcome: parsed.hasOutcome, pairResults, entries, stem: state.stems.pairs };
     } else {
       const parsed = DD.parsePrimerList(rows);
@@ -216,7 +218,9 @@ async function run() {
       const jobs = DD.multiplexJobs(parsed.primers, type);
       const entries = new Array(jobs.length);
       await runChunked(jobs.length, i => { entries[i] = DD.runJob(jobs[i], i + 1); }, 'combinations');
-      state.run = { mode: 'multiplex', type, primers: parsed.primers, notes: parsed.notes, entries, stem: state.stems.multiplex };
+      const nc = DD.countNotComputed(entries.map(e => e.result));
+      if (nc) messages.push(`${nc} of ${entries.length} combinations not computed: ${DD.NOT_COMPUTED}`);
+      state.run ={ mode: 'multiplex', type, primers: parsed.primers, notes: parsed.notes, entries, stem: state.stems.multiplex };
     }
     render();
     const r = state.run;
@@ -245,6 +249,7 @@ function alignmentHtml(e, gap) {
     return `<div class="align-title">3' ${esc(top)} vs ${esc(bot)}: ${aln.wc_pairs} WC pairs, ${aln.consec_3p} at 3' end</div>` +
       `<div class="align-block">${esc(lines.join('\n'))}</div>`;
   };
+  if (r.min_end_hetero === null) return `<span class="muted">not computed: ${esc(DD.notComputedReason(e.seqA, e.seqB))}</span>`;
   let html = block(r.aln, d[0], d[1]);
   if (e.type === 'heterodimer') html += `<details class="alt"><summary>other direction</summary>${block(r.aln_alt, d[2], d[3])}</details>`;
   return html;
@@ -257,13 +262,13 @@ function render() {
   const gap = $('gap-char').value;
   const all = sortedEntries();
   const flaggedOnly = $('filter-mode').value === 'flagged';
-  const shown = flaggedOnly ? all.filter(e => e.result.min_end_hetero < threshold) : all;
+  const shown = flaggedOnly ? all.filter(e => DD.isFlagged(e.result.min_end_hetero, threshold)) : all;
 
-  const counts = { high: 0, medium: 0, low: 0 };
+  const counts = { high: 0, medium: 0, low: 0, none: 0 };
   let nFlagged = 0;
   all.forEach(e => {
     counts[DD.riskTier(e.result.min_end_hetero)]++;
-    if (e.result.min_end_hetero < threshold) nFlagged++;
+    if (DD.isFlagged(e.result.min_end_hetero, threshold)) nFlagged++;
   });
   const what = runData.mode === 'pairs' ? `${runData.rows.length} pairs` : `${runData.primers.length} primers`;
   $('summary-bar').innerHTML =
@@ -272,6 +277,7 @@ function render() {
     `<span>${riskBadge(-9)} <strong>${counts.high}</strong></span>` +
     `<span>${riskBadge(-1)} <strong>${counts.medium}</strong></span>` +
     `<span>${riskBadge(0)} <strong>${counts.low}</strong></span>` +
+    (counts.none ? `<span>${riskBadge(null)} <strong>${counts.none}</strong></span>` : '') +
     `<span>shown: <strong>${shown.length}</strong></span>`;
 
   const showType = runData.type === 'both';
@@ -285,7 +291,7 @@ function render() {
   const rowsHtml = shown.slice(0, DISPLAY_LIMIT).map(e => {
     const r = e.result;
     const tier = DD.riskTier(r.min_end_hetero);
-    const flagged = r.min_end_hetero < threshold;
+    const flagged = DD.isFlagged(r.min_end_hetero, threshold);
     const homo = e.type === 'homodimer';
     return '<tr class="data-row">' +
       `<td>${e.n}</td>` + (showType ? `<td>${e.type}</td>` : '') +
@@ -294,7 +300,7 @@ function render() {
       `<td class="num">${fmt2(r['end_left-right_dg'])}</td>` +
       `<td class="num">${homo ? '' : fmt2(r['end_right-left_dg'])}</td>` +
       `<td class="num dg-${tier}">${fmt2(r.min_end_hetero)}</td>` +
-      `<td>${riskBadge(r.min_end_hetero)}</td><td>${flagged ? 'YES' : 'NO'}</td>` +
+      `<td>${riskBadge(r.min_end_hetero)}</td><td>${tier === 'none' ? '' : flagged ? 'YES' : 'NO'}</td>` +
       (showOutcome ? `<td>${e.outcome ? esc(e.outcome) : ''}</td>` : '') + '</tr>' +
       `<tr class="aln-row"><td></td><td colspan="${nCols - 1}">${alignmentHtml(e, gap)}</td></tr>`;
   });
@@ -314,7 +320,7 @@ function render() {
 }
 
 function primerSummary(threshold) {
-  const flagged = state.run.entries.filter(e => e.type === 'heterodimer' && e.result.min_end_hetero < threshold);
+  const flagged = state.run.entries.filter(e => e.type === 'heterodimer' && DD.isFlagged(e.result.min_end_hetero, threshold));
   const map = new Map();
   flagged.forEach(e => {
     [[e.idA, e.seqA], [e.idB, e.seqB]].forEach(([id, seq]) => {

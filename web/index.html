@@ -236,7 +236,9 @@
     <div class="card-body info-section">
       <p>The model was calibrated on 200 RT-qPCR reactions (100 confirmed dimers, 100 clean pairs; data courtesy of Biogazelle):
       250 nM of each primer, SsoAdvanced Universal SYBR Green Supermix, 45 cycles, 60 &deg;C annealing, evaluated in no-template
-      control (NTC) reactions. A positive NTC signal defined a dimer. Area under the ROC curve: <strong>0.939</strong>.</p>
+      control (NTC) reactions. A positive NTC signal defined a dimer. Area under the ROC curve: <strong>0.939</strong>.
+      The primers were 16 to 28 nt long (median 20 nt); the thresholds have not been tested on longer primers, such as
+      primers with adapter tails.</p>
       <table class="info-table">
         <thead><tr><th><code>min_end_hetero</code> threshold</th><th>criterion</th><th>sensitivity</th><th>specificity</th></tr></thead>
         <tbody>
@@ -305,6 +307,10 @@
       <ul>
         <li>separators: tab, comma or semicolon; files: .xlsx, .csv, .tsv, .txt; lines starting with <code>#</code> are ignored</li>
         <li>sequences may contain A, C, G and T only (case-insensitive)</li>
+        <li>primer length: primer3 needs at least one of the two sequences to be 60 nt or shorter. A pair of two primers longer
+        than 60 nt, and the self-dimer of a primer longer than 60 nt, are not computed: their &Delta;G values stay empty,
+        <code>flagged</code> and <code>predicted</code> read <code>not computed</code>, the alignment report gives the reason,
+        and sorting puts them last.</li>
         <li>downloads: the results table (.xlsx, .tsv, .csv) and the alignment report (.txt) have the same layout as the Python script output</li>
         <li>every output file states the DimerDetective version and build, for example <code>1.2 (build 20261102-0058)</code>: in the header of the alignment report and in a final <code>version</code> column of the tables. The build is the date and time (Belgian time) of the last change; the version (1.2) is the one to cite.</li>
       </ul>
@@ -324,7 +330,7 @@
     <div class="card-body info-section">
       <p>DimerDetective is open source (GPL-2.0) at <a href="https://github.com/jvdesomp/DimerDetective">github.com/jvdesomp/DimerDetective</a>,
       with the Python command-line script that gives the same results.</p>
-      <p>Software versions used for the results reported here: DimerDetective 1.2 (build 20261102-0951); primer3-py 2.4.0,
+      <p>Software versions used for the results reported here: DimerDetective 1.2 (build 20261102-1406); primer3-py 2.4.0,
       which includes libprimer3 release 2.6.1 (<code>calc_end_stability</code> and <code>thal.c</code>, the latter compiled unchanged
       for this web app); Emscripten 6.0.13 (compilation to WebAssembly); Python 3.13.5 with pandas 3.1.0 and openpyxl 3.1.5
       (Python script; the automated checks also use Python 3.12); SheetJS 0.20.3 (Excel import and export); matplotlib 3.11.2

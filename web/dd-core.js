@@ -19,7 +19,7 @@
   // Belgian time, YYYYMMDD-hhmm). Must equal VERSION and BUILD in
   // python/make_primer_alignments.py; both go into every output file.
   const VERSION = '1.2';
-  const BUILD = '20261102-1406';
+  const BUILD = '20261102-1447';
   const VERSION_LABEL = `${VERSION} (build ${BUILD})`;
 
   // Reaction conditions used for calibration (same as PRIMER3_PARAMS).
@@ -147,7 +147,8 @@
     const rr = endStability(seqB, seqB);
 
     const minHet = minOrNull(lr.dg, rl.dg);
-    const which = minHet === null || lr.dg <= rl.dg ? 'A' : 'B';
+    // dominant direction at the reported precision (4 decimals); a tie goes to the left primer
+    const which = minHet === null || Number(lr.dg.toFixed(4)) <= Number(rl.dg.toFixed(4)) ? 'A' : 'B';
     const dom = which === 'A' ? lr : rl;
     const alt = which === 'A' ? rl : lr;
 
@@ -597,13 +598,16 @@
     return { type, n, idA, seqA, idB, seqB, result: computePair(seqA, seqB) };
   }
 
-  // Not computed entries go last in both directions.
+  // Sort on the reported precision (4 decimals); equal values keep their
+  // input order, and not computed entries go last in both directions.
+  // Native primer3-py and this WebAssembly build differ in the last digits
+  // of some values, which would otherwise reorder near ties.
   function sortEntries(entries, sort) {
     const e = entries.slice();
     const by = sign => (a, b) => {
       const x = a.result.min_end_hetero, y = b.result.min_end_hetero;
       if (x === null || y === null) return (x === null) - (y === null);
-      return sign * (x - y);
+      return sign * (Number(x.toFixed(4)) - Number(y.toFixed(4)));
     };
     if (sort === 'asc') e.sort(by(1));
     else if (sort === 'desc') e.sort(by(-1));

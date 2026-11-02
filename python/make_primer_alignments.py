@@ -111,7 +111,7 @@ import primer3
 # change in Belgian time, YYYYMMDD-hhmm). Must equal VERSION and BUILD in
 # web/dd-core.js; both are written into every output file.
 VERSION = '1.2'
-BUILD = '20261102-1406'
+BUILD = '20261102-1447'
 VERSION_LABEL = f"{VERSION} (build {BUILD})"
 
 # ── Thermodynamic helpers ──────────────────────────────────────────────────
@@ -351,8 +351,10 @@ def compute_pair(seq_a, seq_b):
     end_rr_dg   = end_dg(seq_b, seq_b)
     min_end_homo = _min(end_ll_dg, end_rr_dg)
 
-    # Dominant direction: lower (more negative) ΔG drives the primary alignment
-    if min_end_hetero is None or het_fwd_dg <= het_rev_dg:   # left-right is dominant
+    # Dominant direction: lower (more negative) ΔG drives the primary alignment.
+    # Compared at the reported precision (4 decimals), so that a tie goes to
+    # the left primer in the script and in the web app alike.
+    if min_end_hetero is None or round(het_fwd_dg, 4) <= round(het_rev_dg, 4):   # left-right is dominant
         top_dom, bot_dom = seq_a, seq_b
         top_alt, bot_alt = seq_b, seq_a
         which = 'A'             # 3' end of A is dominant
@@ -908,9 +910,12 @@ def run_multiplex(args):
 
     # ── Sort (not computed entries last) ──────────────────────────────────
     sort = getattr(args, 'sort', 'asc')
+    # Sort on the reported precision (4 decimals); equal values keep their
+    # input order. Native primer3-py and the WebAssembly build differ in the
+    # last digits of some values, which would otherwise reorder near ties.
     def dg_key(e, sign):
         v = e[5]['min_end_hetero']
-        return (v is None, 0.0 if v is None else sign * v)
+        return (v is None, 0.0 if v is None else sign * round(v, 4))
     if sort == 'asc':
         entries.sort(key=lambda e: dg_key(e, 1))
     elif sort == 'desc':

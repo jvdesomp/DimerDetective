@@ -43,10 +43,14 @@ def compare(label, a_path, b_path):
     if a == b:
         print(f"  {label}: identical ({len(a)} lines)")
         return True
-    diff = list(difflib.unified_diff(a, b, 'python', 'web', lineterm='', n=1))
-    removed = sum(1 for d in diff if d.startswith('-') and not d.startswith('---'))
-    added = sum(1 for d in diff if d.startswith('+') and not d.startswith('+++'))
-    print(f"  {label}: differs ({removed} lines only in python, {added} only in web)")
+    # diff only a window from the first difference: a full difflib run on
+    # large reports (over a million lines) takes hours
+    first = next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
+    n_diff = sum(x != y for x, y in zip(a, b)) + abs(len(a) - len(b))
+    lo = max(0, first - 2)
+    diff = list(difflib.unified_diff(a[lo:first + 40], b[lo:first + 40], 'python', 'web', lineterm='', n=1))
+    print(f"  {label}: differs ({len(a)} lines in python, {len(b)} in web; first at line {first + 1}, "
+          f"{n_diff} positions differ)")
     print('\n'.join('    ' + d for d in diff[:40]))
     return False
 

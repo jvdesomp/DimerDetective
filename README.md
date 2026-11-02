@@ -13,7 +13,7 @@ For each primer pair, DimerDetective computes the free energy (ΔG, kcal/mol) of
 
 The reaction conditions match the calibration and are fixed, so that results stay comparable across studies: 50 mM Na⁺, 1.5 mM Mg²⁺, 0.6 mM dNTP, 50 nM primer, 37 °C and a maximum loop of 30 nt.
 
-The output is a results table (.xlsx, .tsv or .csv) and an alignment report (.txt). Each alignment diagram is the structure primer3 used to compute the reported ΔG, including bulges and internal loops.
+The output is a results table (.xlsx, .tsv or .csv) and an alignment report (.txt). Each alignment diagram is the structure primer3 used to compute the reported ΔG, including bulges and internal loops. The direction with the lower ΔG (the dominant direction) is shown first. The dominant direction and the sort order use ΔG at the reported precision (4 decimals): a tie in direction goes to the left primer, and equal values keep their input order.
 
 ## Training data and performance
 
@@ -95,7 +95,7 @@ Every output file of the web app and the script states the version and build, fo
 
 The results reported here were obtained with:
 
-- DimerDetective 1.2 (build 20261102-1406): web app and Python script
+- DimerDetective 1.2 (build 20261102-1447): web app and Python script
 - primer3-py 2.4.0, which includes libprimer3 release 2.6.1: `calc_end_stability` and `thal.c` (the latter compiled unchanged for the web app)
 - Emscripten 6.0.13: compilation of `thal.c` to WebAssembly
 - Python 3.13.5 with pandas 3.1.0 and openpyxl 3.1.5: Python script (the automated checks also use Python 3.12)

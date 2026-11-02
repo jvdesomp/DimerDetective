@@ -215,7 +215,8 @@
       <code>min_end_hetero</code>. Each primer's self-dimer is reported once, in its homodimer row, as <code>end_self_dg</code>
       (&Delta;G for the 3&prime; end of the primer annealed to itself); the heterodimer columns are empty in those rows.</p>
       <p>The direction with the lower &Delta;G is the dominant direction; its alignment is shown first. Classification uses
-      <code>min_end_hetero</code> only.</p>
+      <code>min_end_hetero</code> only. The dominant direction and the sort order use &Delta;G at the reported precision
+      (4 decimals): a tie in direction goes to the left primer, and equal values keep their input order.</p>
       <div class="warning" id="homodimer-warning">
         <p><strong>&#9888; homodimer predictions are not validated.</strong> In the training data, the no-template control (NTC)
         signal cannot tell homodimers from heterodimers, and predicted homodimers had no predictive value:</p>
@@ -330,7 +331,7 @@
     <div class="card-body info-section">
       <p>DimerDetective is open source (GPL-2.0) at <a href="https://github.com/jvdesomp/DimerDetective">github.com/jvdesomp/DimerDetective</a>,
       with the Python command-line script that gives the same results.</p>
-      <p>Software versions used for the results reported here: DimerDetective 1.2 (build 20261102-1406); primer3-py 2.4.0,
+      <p>Software versions used for the results reported here: DimerDetective 1.2 (build 20261102-1447); primer3-py 2.4.0,
       which includes libprimer3 release 2.6.1 (<code>calc_end_stability</code> and <code>thal.c</code>, the latter compiled unchanged
       for this web app); Emscripten 6.0.13 (compilation to WebAssembly); Python 3.13.5 with pandas 3.1.0 and openpyxl 3.1.5
       (Python script; the automated checks also use Python 3.12); SheetJS 0.20.3 (Excel import and export); matplotlib 3.11.2

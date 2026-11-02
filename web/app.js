@@ -380,9 +380,9 @@ function downloadAlignments() {
 
 function downloadSummary() {
   const { rows, total } = primerSummary(getThreshold());
-  const lines = ['rank\tid\tsequence\tflagged_dimers\tshare_of_flagged_pct\tmean_dg\tlowest_dg'];
+  const lines = ['rank\tid\tsequence\tflagged_dimers\tshare_of_flagged_pct\tmean_dg\tlowest_dg\tversion'];
   rows.forEach((r, i) => lines.push([i + 1, r.id, r.seq, r.count, (r.count / total * 100).toFixed(1),
-    (r.dgSum / r.count).toFixed(4), r.dgMin.toFixed(4)].join('\t')));
+    (r.dgSum / r.count).toFixed(4), r.dgMin.toFixed(4), DD.VERSION_LABEL].join('\t')));
   download(lines.join('\n') + '\n', stem() + '_primer_summary.tsv');
 }
 
@@ -514,6 +514,7 @@ function wire() {
   document.querySelectorAll('.max-pairs').forEach(s => { s.textContent = MAX_PAIRS; });
   document.querySelectorAll('.max-primers').forEach(s => { s.textContent = MAX_PRIMERS; });
   document.querySelectorAll('#version, .version').forEach(s => { s.textContent = DD.VERSION; });
+  document.querySelectorAll('.version-label').forEach(s => { s.textContent = DD.VERSION_LABEL; });
   switchMode('pairs');
 }
 

@@ -15,7 +15,12 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
+  // Version (cite this) and build stamp (date and time of the change in
+  // Belgian time, YYYYMMDD-hhmm). Must equal VERSION and BUILD in
+  // python/make_primer_alignments.py; both go into every output file.
   const VERSION = '1.2';
+  const BUILD = '20261102-0058';
+  const VERSION_LABEL = `${VERSION} (build ${BUILD})`;
 
   // Reaction conditions used for calibration (same as PRIMER3_PARAMS).
   const PARAMS = { mv_conc: 50.0, dv_conc: 1.5, dntp_conc: 0.6, dna_conc: 50.0, temp_c: 37.0, max_loop: 30 };
@@ -511,6 +516,7 @@
     const flagged = pairResults.filter(r => r.min_end_hetero < threshold).length;
     const lines = [
       '='.repeat(72), 'DimerDetective alignment output', '',
+      `version   : ${VERSION_LABEL}`,
       'mode      : pairs',
       `type      : ${type}`,
       `threshold : ${fmt(threshold, 2)} kcal/mol → dimer`,
@@ -548,6 +554,7 @@
         flagged: flagged ? 'YES' : 'NO', predicted: flagged ? 'dimer' : 'clean',
       };
       if (hasOutcome) t.outcome = row.outcome === null ? '' : row.outcome;
+      t.version = VERSION_LABEL;
       return t;
     });
   }
@@ -556,6 +563,7 @@
     const flagged = sorted.filter(e => e.result.min_end_hetero < threshold).length;
     const lines = [
       '='.repeat(72), 'DimerDetective alignment output', '',
+      `version   : ${VERSION_LABEL}`,
       'mode      : multiplex',
       `threshold : ${fmt(threshold, 2)} kcal/mol → dimer`,
       `primers   : ${nPrimers}   |   pairs: ${sorted.length}   |   flagged: ${flagged}`,
@@ -578,6 +586,7 @@
         'end_left-left_dg': r['end_left-left_dg'], 'end_right-right_dg': r['end_right-right_dg'],
         min_end_homo: r.min_end_homo,
         flagged: r.min_end_hetero < threshold ? 'YES' : 'NO',
+        version: VERSION_LABEL,
       };
     });
   }
@@ -612,7 +621,7 @@
   }
 
   return {
-    VERSION, PARAMS, THRESHOLDS, DEFAULT_THRESHOLD,
+    VERSION, BUILD, VERSION_LABEL, PARAMS, THRESHOLDS, DEFAULT_THRESHOLD,
     init, endStability, clearCache, parseStructure, computePair,
     textToRows, parsePairs, parsePrimerList,
     pairEntries, multiplexJobs, runJob, sortEntries,

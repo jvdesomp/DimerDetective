@@ -105,6 +105,13 @@ import sys
 import pandas as pd
 import primer3
 
+# DimerDetective version (cite this) and build stamp (date and time of the
+# change in Belgian time, YYYYMMDD-hhmm). Must equal VERSION and BUILD in
+# web/dd-core.js; both are written into every output file.
+VERSION = '1.2'
+BUILD = '20261102-0058'
+VERSION_LABEL = f"{VERSION} (build {BUILD})"
+
 # ntthal binary (part of the primer3 package) — fallback for alignments when
 # primer3-py's thal() cannot be called directly.
 _NTTHAL = shutil.which('ntthal')
@@ -720,6 +727,7 @@ def run_pairs(args):
         }
         if col_outcome:
             tsv_row['outcome'] = outcome
+        tsv_row['version'] = VERSION_LABEL
         tsv_rows.append(tsv_row)
 
     # ── Write results table ────────────────────────────────────────────────
@@ -737,6 +745,7 @@ def run_pairs(args):
         '=' * 72,
         'DimerDetective alignment output',
         '',
+        f"version   : {VERSION_LABEL}",
         f"mode      : pairs",
         f"type      : {pair_type}",
         f"threshold : {args.threshold:.2f} kcal/mol → dimer",
@@ -842,6 +851,7 @@ def run_multiplex(args):
             'end_right-right_dg': round(result['end_right-right_dg'], 4),
             'min_end_homo':       round(result['min_end_homo'],        4),
             'flagged':            flagged,
+            'version':            VERSION_LABEL,
         })
 
     n_flagged = sum(1 for r in tsv_rows if r['flagged'] == 'YES')
@@ -859,6 +869,7 @@ def run_multiplex(args):
         '=' * 72,
         'DimerDetective alignment output',
         '',
+        f"version   : {VERSION_LABEL}",
         f"mode      : multiplex",
         f"threshold : {args.threshold:.2f} kcal/mol → dimer",
         f"primers   : {n}   |   pairs: {len(entries)}   |   flagged: {n_flagged}",
@@ -933,7 +944,9 @@ def main():
             'homodimer predictions are not validated; interpret with caution'
         ),
     )
+    parser.add_argument('--version', action='version', version=f"DimerDetective {VERSION_LABEL}")
     args = parser.parse_args()
+    print(f"DimerDetective {VERSION_LABEL}")
     method = alignment_method()
     if method is None:
         sys.exit("ERROR: cannot draw primer3 alignments: primer3-py's thal() is not\n"

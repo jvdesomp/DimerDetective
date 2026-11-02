@@ -36,6 +36,13 @@ const ALIGNMENT = [
   const alnOk = lines.join('\n') === ALIGNMENT.join('\n');
   if (!alnOk) failed++;
   console.log(`${alnOk ? 'ok  ' : 'FAIL'} alignment\n${lines.join('\n')}`);
+  // the script and the web app must carry the same version and build
+  const py = require('fs').readFileSync(require('path').join(__dirname, '..', 'python', 'make_primer_alignments.py'), 'utf8');
+  const pyVersion = (py.match(/^VERSION = '([^']+)'/m) || [])[1];
+  const pyBuild = (py.match(/^BUILD = '([^']+)'/m) || [])[1];
+  const verOk = pyVersion === DD.VERSION && pyBuild === DD.BUILD && /^\d{8}-\d{4}$/.test(DD.BUILD);
+  if (!verOk) failed++;
+  console.log(`${verOk ? 'ok  ' : 'FAIL'} version: web ${DD.VERSION_LABEL}, script ${pyVersion} (build ${pyBuild})`);
   if (failed) { console.error(`${failed} check(s) failed`); process.exit(1); }
   console.log('all checks passed');
 })().catch(e => { console.error(e); process.exit(1); });

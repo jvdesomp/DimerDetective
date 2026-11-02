@@ -83,6 +83,8 @@ python python/make_primer_alignments.py --mode multiplex --input primers.xlsx --
 
 DimerDetective version 1.2, Jo Vandesompele, Ghent University, https://jvdesomp.github.io/DimerDetective/
 
+Every output file of the web app and the script states the version and build, for example `1.2 (build 20261102-0058)`: in the header of the alignment report and in a final `version` column of the tables. The build is the date and time (Belgian time, YYYYMMDD-hhmm) of the last change; small changes keep version 1.2 and get a new build. The web app shows the build in its footer; the script prints it, also with `--version`.
+
 ## License and references
 
 GPL-2.0, as primer3 and primer3-py. © Ghent University 2026.

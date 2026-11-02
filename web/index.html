@@ -294,6 +294,7 @@
         <li>separators: tab, comma or semicolon; files: .xlsx, .csv, .tsv, .txt; lines starting with <code>#</code> are ignored</li>
         <li>sequences may contain A, C, G and T only (case-insensitive)</li>
         <li>downloads: the results table (.xlsx, .tsv, .csv) and the alignment report (.txt) have the same layout as the Python script output</li>
+        <li>every output file states the DimerDetective version and build, for example <code>1.2 (build 20261102-0058)</code>: in the header of the alignment report and in a final <code>version</code> column of the tables. The build is the date and time (Belgian time) of the last change; the version (1.2) is the one to cite.</li>
       </ul>
     </div>
   </section>
@@ -353,7 +354,7 @@
   </section>
 </main>
 
-<div class="footer">&copy; Ghent University 2026 &middot; DimerDetective <span class="version"></span> &middot;
+<div class="footer">&copy; Ghent University 2026 &middot; DimerDetective <span class="version-label"></span> &middot;
   thermodynamics by <a href="https://github.com/primer3-org/primer3">primer3</a> via <a href="https://github.com/libnano/primer3-py">primer3-py</a> 2.4.0, compiled to WebAssembly &middot;
   <a href="https://github.com/jvdesomp/DimerDetective">source code</a> &middot;
   <a href="#contact" id="footer-contact">contact</a></div>

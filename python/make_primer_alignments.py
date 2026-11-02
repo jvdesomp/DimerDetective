@@ -79,28 +79,24 @@ Alignment display:
   Bottom strand : 3'→5' left to right
   | = Watson-Crick pair   . = bulge on opposite strand
 
-  Alignment method (in order of preference):
-    1. primer3-py's own thal() — the C function behind calc_end_stability,
-       called with structure output.  The structure is the one behind the
-       reported ΔG, with bulges and internal loops.  Where primer3 finds no
-       structure (ΔG = 0) the report says [no significant structure].
-    2. ntthal -a END1 (primer3 binary on PATH) — only if 1 is unavailable
-       (for example on Windows).  A separately installed primer3 release may
-       find another structure.  Without either, the script stops.
+  Alignment method: primer3-py's own thal() — the C function behind
+  calc_end_stability, called with structure output.  The structure is the
+  one behind the reported ΔG, with bulges and internal loops.  Where primer3
+  finds no structure (ΔG = 0) the report says [no significant structure].
+  On Windows, thal() cannot be reached inside primer3-py and the script
+  stops; use the web app or run the script in WSL.
 
 primer3 parameters:
   mv_conc=50 mM, dv_conc=1.5 mM, dntp_conc=0.6 mM, dna_conc=50 nM, temp_c=37 °C
 
 Requirements:
-  pip install primer3-py openpyxl pandas   (primer3-py 2.x)
+  pip install primer3-py==2.4.0 openpyxl pandas
 """
 
 import argparse
 import ctypes
 import itertools
 import re
-import shutil
-import subprocess
 import sys
 import pandas as pd
 import primer3
@@ -109,13 +105,8 @@ import primer3
 # change in Belgian time, YYYYMMDD-hhmm). Must equal VERSION and BUILD in
 # web/dd-core.js; both are written into every output file.
 VERSION = '1.2'
-BUILD = '20261102-0209'
+BUILD = '20261102-0951'
 VERSION_LABEL = f"{VERSION} (build {BUILD})"
-
-# ntthal binary (part of the primer3 package) — fallback for alignments when
-# primer3-py's thal() cannot be called directly.
-_NTTHAL = shutil.which('ntthal')
-
 
 # ── Thermodynamic helpers ──────────────────────────────────────────────────
 
@@ -202,13 +193,11 @@ def reverse_complement(seq):
 
 # ── Alignment ─────────────────────────────────────────────────────────────
 
-# ── ntthal-based alignment (exact primer3 structure) ──────────────────────
-
-def _parse_ntthal_structure(output):
-    # Parse the 4-line SEQ/STR block from ntthal stdout/stderr.
+def _parse_structure(output):
+    # Parse the 4-line SEQ/STR block that thal() returns (as printed by ntthal).
     # Returns a 3-line alignment dict, or None if parsing fails.
     #
-    # ntthal format (tab-separated on Linux, 4-char space prefix on macOS):
+    # format (tab-separated on Linux, 4-char space prefix on macOS):
     #   SEQ<sep><line0>  top 5' overhang + bulge nucleotides + dash placeholders
     #   SEQ<sep><line1>  top strand paired blocks only
     #   STR<sep><line2>  bottom strand paired blocks only (3'->5' direction)
@@ -293,48 +282,15 @@ def _parse_ntthal_structure(output):
         'bot_line':   "3'-" + bot_s   + "-5'",
         'wc_pairs':   match_s.count('|'),
         'consec_3p':  consec_3p,
-        'method':     'ntthal',
     }
-
-
-def _build_alignment_ntthal(top, bot):
-    # Call ntthal -a END1 and parse the structure. Returns None on failure.
-    if _NTTHAL is None:
-        return None
-    p = PRIMER3_PARAMS
-    cmd = [
-        _NTTHAL, '-a', 'END1',
-        '-s1', top.upper(), '-s2', bot.upper(),
-        '-mv', str(p['mv_conc']),
-        '-dv', str(p['dv_conc']),
-        '-n',  str(p['dntp_conc']),
-        '-d',  str(p['dna_conc']),
-        '-t',  str(p['temp_c']),
-    ]
-    try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-        return _parse_ntthal_structure(r.stdout + r.stderr)
-    except Exception:
-        return None
 
 
 def build_alignment(top, bot):
     # Return a 3-line alignment dict for the 3' end of top annealed to bot,
     # or None when primer3 finds no structure.
-    # Uses primer3-py's thal() (the computation behind the reported ΔG); if
-    # that is unavailable, ntthal on PATH.
-    if _THAL is not None:
-        _, structure = _call_thal(_THAL, top.upper(), bot.upper())
-        return _parse_ntthal_structure(structure) if structure else None
-    return _build_alignment_ntthal(top, bot)
-
-
-def alignment_method():
-    if _THAL is not None:
-        return "primer3-py thal() (same computation as ΔG)"
-    if _NTTHAL is not None:
-        return f"ntthal at {_NTTHAL} (separate primer3 program; may differ from primer3-py)"
-    return None
+    # Uses primer3-py's thal(), the computation behind the reported ΔG.
+    _, structure = _call_thal(_THAL, top.upper(), bot.upper())
+    return _parse_structure(structure) if structure else None
 
 
 # ── Per-pair computation ───────────────────────────────────────────────────
@@ -1001,12 +957,13 @@ def main():
     parser.add_argument('--version', action='version', version=f"DimerDetective {VERSION_LABEL}")
     args = parser.parse_args()
     print(f"DimerDetective {VERSION_LABEL}")
-    method = alignment_method()
-    if method is None:
+    if _THAL is None:
         sys.exit("ERROR: cannot draw primer3 alignments: primer3-py's thal() is not\n"
-                 "accessible on this system and ntthal is not on PATH.\n"
-                 "Install primer3 (conda install -c bioconda primer3) to provide ntthal.")
-    print(f"Alignments: {method}")
+                 "accessible on this system (for example on Windows). Use the web app\n"
+                 "or run the script in WSL (Windows Subsystem for Linux).")
+    print("Alignments: primer3-py thal() (same computation as ΔG)")
+    if primer3.__version__ != '2.4.0':
+        print(f"Note: primer3-py {primer3.__version__} is installed; results are identical to the web app with 2.4.0.")
     if args.type != 'heterodimers':
         print("Note: homodimer predictions are not validated; interpret them with caution.")
 

@@ -19,7 +19,7 @@
   // Belgian time, YYYYMMDD-hhmm). Must equal VERSION and BUILD in
   // python/make_primer_alignments.py; both go into every output file.
   const VERSION = '1.2';
-  const BUILD = '20261102-0209';
+  const BUILD = '20261102-0951';
   const VERSION_LABEL = `${VERSION} (build ${BUILD})`;
 
   // Reaction conditions used for calibration (same as PRIMER3_PARAMS).

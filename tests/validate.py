@@ -4,15 +4,14 @@ Check that the web version gives byte-identical output to the Python script.
 
 For each input file, runs python/make_primer_alignments.py and
 tests/dd-cli.js (the web core in Node) with the same settings and compares
-the results tables and the alignment reports. The script must draw its
-alignments with primer3-py's own thal(); the check stops if it falls back
-to ntthal or to approximate alignments.
+the results tables and the alignment reports. The check stops if the
+script cannot draw its alignments with primer3-py's own thal().
 
 Usage:
   python tests/validate.py --mode pairs     data/pairs1.xlsx data/pairs2.xlsx
   python tests/validate.py --mode multiplex data/primers.xlsx
 
-Requirements: pip install primer3-py openpyxl pandas; node on PATH;
+Requirements: pip install primer3-py==2.4.0 openpyxl pandas; node on PATH;
 web/thal.js built with wasm/build.sh.
 """
 import argparse

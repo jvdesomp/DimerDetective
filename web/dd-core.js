@@ -19,7 +19,7 @@
   // Belgian time, YYYYMMDD-hhmm). Must equal VERSION and BUILD in
   // python/make_primer_alignments.py; both go into every output file.
   const VERSION = '1.2';
-  const BUILD = '20261102-0058';
+  const BUILD = '20261102-0115';
   const VERSION_LABEL = `${VERSION} (build ${BUILD})`;
 
   // Reaction conditions used for calibration (same as PRIMER3_PARAMS).
@@ -418,14 +418,11 @@
     let seqCol = findCol(columns, ['primer_seq', 'primer_sequence', 'sequence', 'seq']);
     if (seqCol === null && ((fSeqByName !== null && rSeqByName !== null) || dnaCols.length >= 2)) {
       const pairs = parsePairs(rawRows);
-      const seen = new Set(), primers = [];
-      pairs.rows.forEach(p => {
-        [[p.fwd_name, p.fwd], [p.rev_name, p.rev]].forEach(([id, seq]) => {
-          const s = seq.toUpperCase();
-          if (!seen.has(s)) { seen.add(s); primers.push([id, s]); }
-        });
-      });
-      return { primers, errors: pairs.errors, fromPairs: true };
+      const found = [];
+      pairs.rows.forEach(p => { found.push([p.fwd_name, p.fwd.toUpperCase()], [p.rev_name, p.rev.toUpperCase()]); });
+      const { primers, notes } = uniquePrimers(found);
+      notes.unshift(`primer pair table: primers from both sequence columns are used (${found.length} primers)`);
+      return { primers, errors: pairs.errors, notes };
     }
 
     if (seqCol === null) {
@@ -433,7 +430,7 @@
       scores.forEach((s, i) => { if (s > scores[best]) best = i; });
       if (!scores.length || scores[best] < 0.8) {
         errors.push('could not identify a primer sequence column; add a header named primer_seq');
-        return { primers: [], errors };
+        return { primers: [], errors, notes: [] };
       }
       seqCol = best;
     }
@@ -453,7 +450,23 @@
       if (!pid || ['nan', 'none'].includes(pid.toLowerCase())) pid = autoId(primers.length + 1);
       primers.push([pid, seq]);
     });
-    return { primers, errors };
+    return { ...uniquePrimers(primers), errors };
+  }
+
+  // Keep the first primer of each sequence; report merged duplicates
+  // (same wording as _unique_primers in the script).
+  function uniquePrimers(list) {
+    const kept = [], seen = new Map(), dups = [];
+    list.forEach(([pid, seq]) => {
+      if (seen.has(seq)) dups.push([pid, seen.get(seq)]);
+      else { seen.set(seq, pid); kept.push([pid, seq]); }
+    });
+    const notes = [];
+    if (dups.length) {
+      notes.push(`${list.length} primers in the input, ${kept.length} unique sequences; ` +
+        `duplicates merged (first ID kept): ${dups.map(([d, k]) => `${d} = ${k}`).join(', ')}`);
+    }
+    return { primers: kept, notes };
   }
 
   // ── Analyses ────────────────────────────────────────────────────────────
@@ -559,7 +572,7 @@
     });
   }
 
-  function multiplexReport(nPrimers, sorted, threshold, type, sort) {
+  function multiplexReport(nPrimers, sorted, threshold, type, sort, notes) {
     const flagged = sorted.filter(e => e.result.min_end_hetero < threshold).length;
     const lines = [
       '='.repeat(72), 'DimerDetective alignment output', '',
@@ -567,6 +580,7 @@
       'mode      : multiplex',
       `threshold : ${fmt(threshold, 2)} kcal/mol → dimer`,
       `primers   : ${nPrimers}   |   pairs: ${sorted.length}   |   flagged: ${flagged}`,
+      ...(notes || []).map(n => `note      : ${n}`),
       `type      : ${type}`,
       `sorted by : ${SORT_LABELS[sort] || sort}`,
       '| = Watson-Crick pair', '. = bulge on opposite strand',

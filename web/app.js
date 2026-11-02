@@ -210,13 +210,13 @@ async function run() {
     } else {
       const parsed = DD.parsePrimerList(rows);
       messages.push(...parsed.errors);
-      if (parsed.fromPairs) messages.push(`primer pair table detected: using all ${parsed.primers.length} unique primers`);
+      messages.push(...parsed.notes);
       if (parsed.primers.length < 1 || (type !== 'homodimers' && parsed.primers.length < 2)) { messages.push('need at least 2 primers'); return; }
       if (parsed.primers.length > MAX_PRIMERS) { messages.push(`too many primers (${parsed.primers.length}); the maximum is ${MAX_PRIMERS}`); return; }
       const jobs = DD.multiplexJobs(parsed.primers, type);
       const entries = new Array(jobs.length);
       await runChunked(jobs.length, i => { entries[i] = DD.runJob(jobs[i], i + 1); }, 'combinations');
-      state.run = { mode: 'multiplex', type, primers: parsed.primers, entries, stem: state.stems.multiplex };
+      state.run = { mode: 'multiplex', type, primers: parsed.primers, notes: parsed.notes, entries, stem: state.stems.multiplex };
     }
     render();
     const r = state.run;
@@ -374,7 +374,7 @@ function downloadAlignments() {
   const r = state.run, t = getThreshold();
   const text = r.mode === 'pairs'
     ? DD.pairsReport(r.rows, r.pairResults, t, r.type)
-    : DD.multiplexReport(r.primers.length, sortedEntries(), t, r.type, $('sort-mode').value);
+    : DD.multiplexReport(r.primers.length, sortedEntries(), t, r.type, $('sort-mode').value, r.notes);
   download(reportWithGap(text, $('gap-char').value), stem() + '_alignments.txt');
 }
 

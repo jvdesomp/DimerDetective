@@ -35,7 +35,7 @@ The web app was compared with `primer3.calc_end_stability` (primer3-py 2.4.0) on
 
 `tests/validate.py` runs the web core and the Python script on the same input and compares their results tables and alignment reports. On the Biogazelle training data, in pair and multiplex mode, both are byte-identical. GitHub Actions repeats the comparison on every push, using the public example files in `tests/`.
 
-The two implementations differ in one input case, on purpose. If multiplex mode receives a table of primer pairs (two sequence columns), the web app uses all unique primers. The script uses only the first sequence column.
+In multiplex mode, both accept a table of primer pairs (all primers of both sequence columns are used) and analyze identical sequences once, keeping the first ID. Both report this in a note, on screen and in the alignment report.
 
 To run the checks yourself:
 

@@ -287,6 +287,8 @@
       <ul>
         <li>one primer per row: <code>ID</code> and <code>sequence</code>, or the sequence only (IDs P001, P002, &hellip; are generated)</li>
         <li>recognized column names include <code>primer_name</code>, <code>primer_id</code>, <code>name</code>, <code>id</code>, <code>primer_seq</code>, <code>sequence</code> and <code>seq</code></li>
+        <li>a table of primer pairs (four columns, as in pair mode) is also accepted: all primers of both sequence columns are then used</li>
+        <li>identical sequences are analyzed once, with the first ID; a note lists the merged duplicates (also in the alignment report)</li>
         <li>N primers give N &times; (N &minus; 1) / 2 heterodimers plus N homodimers</li>
       </ul>
       <h3>general</h3>

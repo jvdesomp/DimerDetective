@@ -109,7 +109,7 @@ import primer3
 # change in Belgian time, YYYYMMDD-hhmm). Must equal VERSION and BUILD in
 # web/dd-core.js; both are written into every output file.
 VERSION = '1.2'
-BUILD = '20261102-0058'
+BUILD = '20261102-0115'
 VERSION_LABEL = f"{VERSION} (build {BUILD})"
 
 # ntthal binary (part of the primer3 package) — fallback for alignments when
@@ -555,7 +555,13 @@ def _read_primer_list(path):
       3. No header + 1 column             → seq detected by DNA content; IDs auto-generated
       4. No header + 2 columns            → seq detected by DNA content; other col = ID
 
-    Returns a list of (primer_id, primer_seq) tuples.
+    A table of primer pairs (two sequence columns, as in pair mode) is also
+    accepted: all primers of both sequence columns are then used.
+
+    Identical sequences are analyzed once (the first ID is kept).
+
+    Returns (primers, notes): a list of (primer_id, primer_seq) tuples and a
+    list of notes for the user (pair table used, duplicates merged).
     """
     read_fn = pd.read_csv if path.lower().endswith('.csv') else pd.read_excel
 
@@ -576,6 +582,19 @@ def _read_primer_list(path):
     # ── Locate the sequence column ─────────────────────────────────────────
     seq_col = find_col(df, ['primer_seq', 'primer_sequence', 'sequence', 'seq'])
     if seq_col is None:
+        pairs_df = read_fn(path)
+        f_name, f_seq, r_name, r_seq, _ = _pair_columns(pairs_df, required=False)
+        if f_seq is not None and r_seq is not None:
+            found = []
+            for i, row in pairs_df.iterrows():
+                fwd, rev = str(row[f_seq]).strip(), str(row[r_seq]).strip()
+                if fwd.upper() in ('', 'NAN', 'NONE') and rev.upper() in ('', 'NAN', 'NONE'):
+                    continue
+                found.append((str(row[f_name]).strip() if f_name is not None else f"FWD_{i + 1}", fwd.upper()))
+                found.append((str(row[r_name]).strip() if r_name is not None else f"REV_{i + 1}", rev.upper()))
+            primers, notes = _unique_primers(found)
+            notes.insert(0, f"primer pair table: primers from both sequence columns are used ({len(found)} primers)")
+            return primers, notes
         scores = {c: _dna_fraction(df[c]) for c in df.columns}
         best   = max(scores, key=scores.get)
         if scores[best] < 0.8:
@@ -613,17 +632,28 @@ def _read_primer_list(path):
             pid = f"P{len(primers) + 1:0{n_digits}d}"
         primers.append((pid, seq))
 
-    return primers
+    return _unique_primers(primers)
 
 
-# ── Mode: pairs ────────────────────────────────────────────────────────────
+def _unique_primers(primers):
+    """Keep the first primer of each sequence; report merged duplicates."""
+    kept, seen, dups = [], {}, []
+    for pid, seq in primers:
+        if seq in seen:
+            dups.append((pid, seen[seq]))
+        else:
+            seen[seq] = pid
+            kept.append((pid, seq))
+    notes = []
+    if dups:
+        merged = ', '.join(f"{d} = {k}" for d, k in dups)
+        notes.append(f"{len(primers)} primers in the input, {len(kept)} unique sequences; "
+                     f"duplicates merged (first ID kept): {merged}")
+    return kept, notes
 
-def run_pairs(args):
-    if args.input.lower().endswith('.csv'):
-        df = pd.read_csv(args.input)
-    else:
-        df = pd.read_excel(args.input)
 
+def _pair_columns(df, required=True):
+    """Locate the name, sequence and outcome columns of a primer pair table."""
     col_fwd_name = find_col(df, [
         'forward_primer_name', 'fwd_name', 'fwd_id', 'forward_name', 'forward_id',
         'left_primer_name',    'left_name', 'left_id', 'left-id',
@@ -669,8 +699,8 @@ def run_pairs(args):
             if col_rev_name is None and len(non_dna) >= 2:
                 col_rev_name = non_dna[1]
 
-    for col, label in [(col_fwd_seq, 'forward/left primer sequence'),
-                       (col_rev_seq,  'reverse/right primer sequence')]:
+    for col, label in ([(col_fwd_seq, 'forward/left primer sequence'),
+                        (col_rev_seq,  'reverse/right primer sequence')] if required else []):
         if col is None:
             sys.exit(
                 f"ERROR: could not find column for {label}.\n"
@@ -679,6 +709,19 @@ def run_pairs(args):
                 f"                          reverse/rev/right + _primer/_sequence/_seq\n"
                 f"If your columns have other names, rename them or add a row with these headers."
             )
+
+    return col_fwd_name, col_fwd_seq, col_rev_name, col_rev_seq, col_outcome
+
+
+# ── Mode: pairs ────────────────────────────────────────────────────────────
+
+def run_pairs(args):
+    if args.input.lower().endswith('.csv'):
+        df = pd.read_csv(args.input)
+    else:
+        df = pd.read_excel(args.input)
+
+    col_fwd_name, col_fwd_seq, col_rev_name, col_rev_seq, col_outcome = _pair_columns(df)
 
     # ── Derive alignment output path if not given ────────────────────────
     align_path = args.alignments
@@ -790,7 +833,9 @@ def _sort_label(sort):
 
 
 def run_multiplex(args):
-    primers = _read_primer_list(args.input)
+    primers, notes = _read_primer_list(args.input)
+    for note in notes:
+        print(f"Note: {note}")
 
     n          = len(primers)
     n_hetero   = n * (n - 1) // 2
@@ -873,6 +918,7 @@ def run_multiplex(args):
         f"mode      : multiplex",
         f"threshold : {args.threshold:.2f} kcal/mol → dimer",
         f"primers   : {n}   |   pairs: {len(entries)}   |   flagged: {n_flagged}",
+        *[f"note      : {note}" for note in notes],
         f"type      : {getattr(args, 'type', 'both')}",
         f"sorted by : {_sort_label(sort)}",
         "| = Watson-Crick pair",

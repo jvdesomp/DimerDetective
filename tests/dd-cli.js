@@ -35,11 +35,12 @@ function parseArgs(argv) {
   } else {
     const parsed = DD.parsePrimerList(rows);
     if (parsed.errors.length) console.error(parsed.errors.join('\n'));
+    parsed.notes.forEach(n => console.log(`Note: ${n}`));
     const jobs = DD.multiplexJobs(parsed.primers, args.type);
     const entries = jobs.map((j, i) => DD.runJob(j, i + 1));
     const sorted = DD.sortEntries(entries, args.sort);
     fs.writeFileSync(args.output, DD.tableToText(DD.multiplexTable(sorted, args.threshold), '\t'));
-    fs.writeFileSync(args.alignments, DD.multiplexReport(parsed.primers.length, sorted, args.threshold, args.type, args.sort));
+    fs.writeFileSync(args.alignments, DD.multiplexReport(parsed.primers.length, sorted, args.threshold, args.type, args.sort, parsed.notes));
     console.log(`Written ${sorted.length} rows → ${path.basename(args.output)}`);
   }
 })().catch(e => { console.error(e.message); process.exit(1); });

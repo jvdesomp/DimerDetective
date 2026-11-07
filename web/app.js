@@ -527,8 +527,8 @@ function wire() {
 wire();
 setupCounting();
 DD.init(createThal).then(() => {
-  $('engine-status').textContent = 'primer3 engine ready';
+  $('engine-status').textContent = 'Primer3 engine ready';
   $('run-btn').disabled = false;
 }).catch(err => {
-  $('engine-status').textContent = 'the primer3 engine could not be loaded: ' + err.message;
+  $('engine-status').textContent = 'the Primer3 engine could not be loaded: ' + err.message;
 });

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DimerDetective</title>
-<meta name="description" content="Primer dimer prediction from primer3 3' end stability, running in your browser.">
+<meta name="description" content="Primer dimer prediction from Primer3 3' end stability, running in your browser.">
 <meta name="theme-color" content="#1a2744">
 <link rel="icon" type="image/svg+xml" href="img/DimerDetective-favicon.svg">
 <link rel="stylesheet" href="style.css?v=dev">
@@ -18,7 +18,7 @@
   <img src="img/DimerDetective-logo_inverse.svg" alt="DimerDetective logo">
   <div>
     <h1>DimerDetective <span id="version">1.2</span></h1>
-    <div class="sub">primer dimer prediction with primer3, in your browser</div>
+    <div class="sub">primer dimer prediction with Primer3, in your browser</div>
   </div>
 </header>
 
@@ -101,7 +101,7 @@
           <button class="btn btn-secondary" id="clear-btn">&#10005; clear</button>
         </div>
       </div>
-      <div class="status" id="engine-status">loading primer3 engine&hellip;</div>
+      <div class="status" id="engine-status">loading Primer3 engine&hellip;</div>
       <div class="messages" id="messages"></div>
     </div>
   </section>
@@ -170,7 +170,7 @@
   <section class="card">
     <div class="card-header">thermodynamic model</div>
     <div class="card-body info-section">
-      <p>Free energies are computed with the <code>calc_end_stability</code> function of primer3 (Untergasser et al. 2012):
+      <p>Free energies are computed with the <code>calc_end_stability</code> function of Primer3 (Untergasser et al. 2012):
       the <code>thal</code> dynamic programming algorithm in alignment mode <code>END1</code>, with Watson&ndash;Crick nearest-neighbor
       stacks, mismatch stacks, dangling ends, internal loops and bulge loops. The C source of <code>thal</code> and its parameter
       files are taken unchanged from primer3-py 2.4.0 and compiled to WebAssembly, so the web app and the Python script run the
@@ -277,7 +277,7 @@
       <div class="align-block">5'-CTCTATGTGTTGGAGTCAT.GAAG-3'
                ||| |   ||||
 3'-         TTACTCGGAGTCTTCCTTAC-5'</div>
-      <p style="margin-top:8px">The diagram is the structure primer3 used to compute the reported &Delta;G, including bulges and internal loops.</p>
+      <p style="margin-top:8px">The diagram is the structure Primer3 used to compute the reported &Delta;G, including bulges and internal loops.</p>
     </div>
   </section>
 
@@ -308,7 +308,7 @@
       <ul>
         <li>separators: tab, comma or semicolon; files: .xlsx, .csv, .tsv, .txt; lines starting with <code>#</code> are ignored</li>
         <li>sequences may contain A, C, G and T only (case-insensitive)</li>
-        <li>primer length: primer3 needs at least one of the two sequences to be 60 nt or shorter. A pair of two primers longer
+        <li>primer length: Primer3 needs at least one of the two sequences to be 60 nt or shorter. A pair of two primers longer
         than 60 nt, and the self-dimer of a primer longer than 60 nt, are not computed: their &Delta;G values stay empty,
         <code>flagged</code> and <code>predicted</code> read <code>not computed</code>, the alignment report gives the reason,
         and sorting puts them last.</li>
@@ -379,7 +379,7 @@
 </main>
 
 <div class="footer">&copy; Ghent University 2026 &middot; DimerDetective <span class="version-label"></span> &middot;
-  thermodynamics by <a href="https://github.com/primer3-org/primer3">primer3</a> via <a href="https://github.com/libnano/primer3-py">primer3-py</a> 2.4.0, compiled to WebAssembly &middot;
+  thermodynamics by <a href="https://github.com/primer3-org/primer3">Primer3</a> via <a href="https://github.com/libnano/primer3-py">primer3-py</a> 2.4.0, compiled to WebAssembly &middot;
   <a href="https://github.com/jvdesomp/DimerDetective">source code</a> &middot;
   <a href="#contact" id="footer-contact">contact</a></div>
 </div>

@@ -1,6 +1,6 @@
 # DimerDetective
 
-DimerDetective predicts primer dimer formation from the primer3 3′ end stability (`calc_end_stability`) of every primer combination. It comes as a web app that runs entirely in the browser and as a Python command-line script. Both give identical results.
+DimerDetective predicts primer dimer formation from the Primer3 3′ end stability (`calc_end_stability`) of every primer combination. It comes as a web app that runs entirely in the browser and as a Python command-line script. Both give identical results.
 
 Web app: https://jvdesomp.github.io/DimerDetective/
 
@@ -13,7 +13,7 @@ For each primer pair, DimerDetective computes the free energy (ΔG, kcal/mol) of
 
 The reaction conditions match the calibration and are fixed, so that results stay comparable across studies: 50 mM Na⁺, 1.5 mM Mg²⁺, 0.6 mM dNTP, 50 nM primer, 37 °C and a maximum loop of 30 nt.
 
-The output is a results table (.xlsx, .tsv or .csv) and an alignment report (.txt). Each alignment diagram is the structure primer3 used to compute the reported ΔG, including bulges and internal loops. The direction with the lower ΔG (the dominant direction) is shown first. The dominant direction and the sort order use ΔG at the reported precision (4 decimals): a tie in direction goes to the left primer, and equal values keep their input order.
+The output is a results table (.xlsx, .tsv or .csv) and an alignment report (.txt). Each alignment diagram is the structure Primer3 used to compute the reported ΔG, including bulges and internal loops. The direction with the lower ΔG (the dominant direction) is shown first. The dominant direction and the sort order use ΔG at the reported precision (4 decimals): a tie in direction goes to the left primer, and equal values keep their input order.
 
 ## Training data and performance
 
@@ -46,11 +46,11 @@ Interpret homodimer values with caution.
 
 Excel (.xlsx), .csv, .tsv or pasted text. Column names and a header row are optional: sequence columns are recognized by their content, each ID as the column next to its sequence, and an outcome column as a column holding only `dimer` and `clean`; other columns are ignored. Recognized column names (for example `forward_primer`, `left_primer_name`, `primer_seq`, `outcome`) take precedence. The optional outcome column holds the known result of each pair; it is not used in the calculation, but the alignment report compares it with the prediction and the results table repeats it.
 
-Primer length: primer3 needs at least one of the two sequences to be 60 nt or shorter. A pair of two primers longer than 60 nt, and the self-dimer of a primer longer than 60 nt, are not computed: their ΔG values stay empty, `flagged` and `predicted` read `not computed`, the alignment report gives the reason, and sorting puts them last.
+Primer length: Primer3 needs at least one of the two sequences to be 60 nt or shorter. A pair of two primers longer than 60 nt, and the self-dimer of a primer longer than 60 nt, are not computed: their ΔG values stay empty, `flagged` and `predicted` read `not computed`, the alignment report gives the reason, and sorting puts them last.
 
 ## How it works
 
-The thermodynamics are not reimplemented. The C source of primer3's `thal` algorithm (`thal.c`) and its parameter files are taken unchanged from [primer3-py](https://github.com/libnano/primer3-py) 2.4.0 and compiled to WebAssembly with Emscripten:
+The thermodynamics are not reimplemented. The C source of Primer3's `thal` algorithm (`thal.c`) and its parameter files are taken unchanged from [primer3-py](https://github.com/libnano/primer3-py) 2.4.0 and compiled to WebAssembly with Emscripten:
 
 - `wasm/dd_thal.c` makes the same `thal()` call as `primer3.calc_end_stability()`: alignment type `END1`, mode `THL_GENERAL` and the reaction conditions above. It also asks `thal()` for the secondary structure, so each alignment diagram is the structure behind the reported ΔG.
 - `web/dd-core.js` ports the input parsing, scoring metrics and output formats of `python/make_primer_alignments.py`.
@@ -127,7 +127,7 @@ Every push to `main` triggers the GitHub Actions workflow. It compiles `thal.c` 
 
 ## License and references
 
-GPL-2.0, as primer3 and primer3-py. © Ghent University 2026.
+GPL-2.0, as Primer3 and primer3-py. © Ghent University 2026.
 
 - Untergasser A, Cutcutache I, Koressaar T, Ye J, Faircloth BC, Remm M, Rozen SG (2012) Primer3, new capabilities and interfaces. *Nucleic Acids Res* 40:e115.
 - SantaLucia J (1998) A unified view of polymer, dumbbell, and oligonucleotide DNA nearest-neighbor thermodynamics. *PNAS* 95:1460–1465.
